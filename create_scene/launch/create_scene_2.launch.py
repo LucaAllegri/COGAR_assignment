@@ -7,9 +7,6 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from enum import IntEnum
 
-##########################
-###### DO NOT TOUCH ######
-
 BOX = 1
 SPHERE = 2
 CYLINDER = 3
@@ -54,7 +51,7 @@ boxes.append(CollisionObject(shape_type=BOX, name="table_red", size=[0.45, 0.50,
 boxes.append(CollisionObject(shape_type=BOX, name="table_blue", size=[0.50, 0.45, 0.35], position=[-0.17, -0.515, -0.3501], orientation=[0.0, 0.0, 0.0], color=[0.0, 0.0, 1.0, 1.0], ref_link="base_link"))
 
 # STICK
-boxes.append(CollisionObject(shape_type=BOX, name="stick", size=[0.05, 0.05, 1.0], position=[0.35, -0.5, -0.3501], orientation=[0.0, 0.0, 0.0], color=[0.0, 1.0, 0.0, 1.0], ref_link="base_link"))
+boxes.append(CollisionObject(shape_type=CYLINDER, name="stick", size=[0.9,0.05], position=[0.35, -0.5, 0.1], orientation=[0.0, 0.0, 0.0], color=[0.0, 1.0, 0.0, 1.0], ref_link="base_link"))
 
 
 # LEFT WALL

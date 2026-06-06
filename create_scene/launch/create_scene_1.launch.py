@@ -7,9 +7,6 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from enum import IntEnum
 
-##########################
-###### DO NOT TOUCH ######
-
 BOX = 1
 SPHERE = 2
 CYLINDER = 3
