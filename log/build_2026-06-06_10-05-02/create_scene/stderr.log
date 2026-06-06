@@ -1,4 +1,0 @@
-[01m[K/home/luca/ur_ws/src/create_scene/src/scene_setup.cpp:[m[K In function ‘[01m[Kvoid create_object(moveit::planning_interface::PlanningSceneInterface&, int, const string&, std::vector<double, std::allocator<double> >, std::vector<double, std::allocator<double> >, std::vector<double, std::allocator<double> >, std::vector<double, std::allocator<double> >, std::string)[m[K’:
-[01m[K/home/luca/ur_ws/src/create_scene/src/scene_setup.cpp:11:72:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kplanning_scene_interface[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
-   11 | void create_object([01;35m[Kmoveit::planning_interface::PlanningSceneInterface &planning_scene_interface[m[K,
-      |                    [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~[m[K

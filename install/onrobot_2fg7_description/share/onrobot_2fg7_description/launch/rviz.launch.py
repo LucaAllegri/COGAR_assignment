@@ -1,1 +1,0 @@
-/home/luca/ur_ws/src/onrobot_2fg7_description/launch/rviz.launch.py

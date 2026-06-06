@@ -1,1 +1,0 @@
-/home/luca/ur_ws/src/ur5e_2fg7_moveit_config/launch/setup_assistant.launch.py

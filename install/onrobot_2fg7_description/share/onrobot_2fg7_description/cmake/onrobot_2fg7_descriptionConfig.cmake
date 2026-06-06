@@ -1,1 +1,0 @@
-/home/luca/ur_ws/src/build/onrobot_2fg7_description/ament_cmake_core/onrobot_2fg7_descriptionConfig.cmake
