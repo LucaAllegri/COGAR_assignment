@@ -57,7 +57,7 @@ boxes.append(CollisionObject(shape_type=BOX, name="table_blue", size=[0.50, 0.45
 #boxes.append(CollisionObject(shape_type=BOX, name="top_wall", size=[0.70, 0.80, 0.05], position=[-0.45, 0.00, 0.70], orientation=[0.0, 0.0, 0.0], color=[0.55, 0.55, 0.55, 1.0], ref_link="base_link"))
 
 # PARALLELEPIPED TO GRASP
-boxes.append(CollisionObject(shape_type=BOX, name="stick", size=[0.05, 0.05, 1.0], position=[0.35, -0.5, -0.3501], orientation=[0.0, 0.0, 0.0], color=[0.0, 1.0, 0.0, 1.0], ref_link="base_link"))
+boxes.append(CollisionObject(shape_type=BOX, name="object_box", size=[0.06, 0.06, 0.12], position=[0.42, 0.00, 0.00], orientation=[0.0, 0.0, 0.0], color=[0.0, 0.45, 1.0, 1.0], ref_link="base_link"))
 
 
 def generate_launch_description():

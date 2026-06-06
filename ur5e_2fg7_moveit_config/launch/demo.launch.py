@@ -3,5 +3,10 @@ from moveit_configs_utils.launches import generate_demo_launch
 
 
 def generate_launch_description():
-    moveit_config = MoveItConfigsBuilder("ur5e_con_2fg7", package_name="ur5e_2fg7_moveit_config").to_moveit_configs()
+    moveit_config = (
+        MoveItConfigsBuilder("ur5e_con_2fg7", package_name="ur5e_2fg7_moveit_config")
+        .trajectory_execution(file_path="config/moveit_controllers.yaml")
+        .to_moveit_configs()
+    )
+
     return generate_demo_launch(moveit_config)

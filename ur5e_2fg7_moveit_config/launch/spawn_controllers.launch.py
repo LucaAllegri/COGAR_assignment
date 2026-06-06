@@ -1,7 +1,27 @@
-from moveit_configs_utils import MoveItConfigsBuilder
-from moveit_configs_utils.launches import generate_spawn_controllers_launch
-
+from launch import LaunchDescription
+from launch_ros.actions import Node
 
 def generate_launch_description():
-    moveit_config = MoveItConfigsBuilder("ur5e_con_2fg7", package_name="ur5e_2fg7_moveit_config").to_moveit_configs()
-    return generate_spawn_controllers_launch(moveit_config)
+    return LaunchDescription([
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=[
+                "joint_state_broadcaster",
+                "--controller-manager",
+                "/controller_manager"
+            ],
+            output="screen",
+        ),
+
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=[
+                "ur_manipulator_controller",
+                "--controller-manager",
+                "/controller_manager"
+            ],
+            output="screen",
+        ),
+    ])
