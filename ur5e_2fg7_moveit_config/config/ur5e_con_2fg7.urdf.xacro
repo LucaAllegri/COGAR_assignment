@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ur5e_con_2fg7">
+
+    <!--<xacro:arg name="initial_positions_file" default="initial_positions.yaml" /> -->
+
+    <!-- Robot description only: UR5e + 2FG7, without real UR hardware interface -->
+    <xacro:include filename="$(find ur5e_2fg7)/urdf/ur5e_2fg7_description_only.urdf.xacro" />
+
+    <!-- Fake ros2_control system for MoveIt/RViz simulation -->
+    <!--<xacro:include filename="$(find ur5e_2fg7_moveit_config)/config/ur5e_con_2fg7.ros2_control.xacro" />
+
+    <xacro:ur5e_con_2fg7_ros2_control
+        name="FakeSystem"
+        initial_positions_file="$(arg initial_positions_file)" /> -->
+
+</robot>

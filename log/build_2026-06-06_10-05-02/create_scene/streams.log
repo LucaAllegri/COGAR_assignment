@@ -1,0 +1,87 @@
+[0.010s] Invoking command in '/home/luca/ur_ws/src/build/create_scene': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/luca/ur_ws/src/create_scene -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/luca/ur_ws/src/install/create_scene
+[0.050s] -- The C compiler identification is GNU 11.4.0
+[0.091s] -- The CXX compiler identification is GNU 11.4.0
+[0.098s] -- Detecting C compiler ABI info
+[0.152s] -- Detecting C compiler ABI info - done
+[0.158s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.158s] -- Detecting C compile features
+[0.159s] -- Detecting C compile features - done
+[0.161s] -- Detecting CXX compiler ABI info
+[0.218s] -- Detecting CXX compiler ABI info - done
+[0.230s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.230s] -- Detecting CXX compile features
+[0.231s] -- Detecting CXX compile features - done
+[0.234s] -- Found ament_cmake: 1.3.14 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.357s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[0.413s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.438s] -- Found rclcpp: 16.0.19 (/opt/ros/humble/share/rclcpp/cmake)
+[0.472s] -- Found rosidl_generator_c: 3.1.8 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.476s] -- Found rosidl_adapter: 3.1.8 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.483s] -- Found rosidl_generator_cpp: 3.1.8 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.493s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.508s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.546s] -- Found rmw_implementation_cmake: 6.1.2 (/opt/ros/humble/share/rmw_implementation_cmake/cmake)
+[0.548s] -- Found rmw_cyclonedds_cpp: 1.3.4 (/opt/ros/humble/share/rmw_cyclonedds_cpp/cmake)
+[0.566s] -- Using RMW implementation 'rmw_cyclonedds_cpp' as default
+[0.573s] -- Looking for pthread.h
+[0.626s] -- Looking for pthread.h - found
+[0.626s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+[0.685s] -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+[0.686s] -- Found Threads: TRUE  
+[0.726s] -- Found moveit_ros_planning_interface: 2.5.9 (/opt/ros/humble/share/moveit_ros_planning_interface/cmake)
+[0.744s] -- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.74.0/BoostConfig.cmake (found version "1.74.0") found components: date_time filesystem program_options system thread 
+[0.872s] -- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.74.0/BoostConfig.cmake (found version "1.74.0") found components: chrono date_time filesystem iostreams program_options regex serialization system thread 
+[0.905s] -- Found parameter_traits: 0.7.1 (/opt/ros/humble/share/parameter_traits/cmake)
+[0.917s] -- Found rclcpp_lifecycle: 16.0.19 (/opt/ros/humble/share/rclcpp_lifecycle/cmake)
+[0.937s] -- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.74.0/BoostConfig.cmake (found version "1.74.0") found components: filesystem 
+[1.001s] -- library: /usr/lib/x86_64-linux-gnu/libcurl.so
+[1.027s] -- Found Eigen3: TRUE (found version "3.4.0") 
+[1.027s] -- Ensuring Eigen3 include directory is part of orocos-kdl CMake target
+[1.133s] -- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.74.0/BoostConfig.cmake (found version "1.74.0") found components: system filesystem date_time program_options thread chrono 
+[1.158s] -- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.74.0/BoostConfig.cmake (found version "1.74.0") found components: thread system filesystem regex date_time program_options 
+[1.217s] -- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.74.0/BoostConfig.cmake (found version "1.74.0") found components: system filesystem date_time program_options thread 
+[1.241s] -- Found moveit: 2.5.9 (/opt/ros/humble/share/moveit/cmake)
+[1.244s] -- Found ament_lint_auto: 0.12.15 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[1.306s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[1.306s] -- Configured cppcheck include dirs: 
+[1.306s] -- Configured cppcheck exclude dirs and/or files: 
+[1.306s] -- Added test 'flake8' to check Python code syntax and style conventions
+[1.307s] -- Added test 'lint_cmake' to check CMake code style
+[1.307s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[1.308s] -- Added test 'uncrustify' to check C / C++ code style
+[1.308s] -- Configured uncrustify additional arguments: 
+[1.309s] -- Added test 'xmllint' to check XML markup files
+[1.311s] -- Configuring done
+[1.329s] -- Generating done
+[1.335s] -- Build files have been written to: /home/luca/ur_ws/src/build/create_scene
+[1.346s] Invoked command in '/home/luca/ur_ws/src/build/create_scene' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/luca/ur_ws/src/create_scene -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/luca/ur_ws/src/install/create_scene
+[1.347s] Invoking command in '/home/luca/ur_ws/src/build/create_scene': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/luca/ur_ws/src/build/create_scene -- -j8 -l8
+[1.384s] [ 50%] [32mBuilding CXX object CMakeFiles/scene.dir/src/scene_setup.cpp.o[0m
+[4.209s] [01m[K/home/luca/ur_ws/src/create_scene/src/scene_setup.cpp:[m[K In function ‘[01m[Kvoid create_object(moveit::planning_interface::PlanningSceneInterface&, int, const string&, std::vector<double, std::allocator<double> >, std::vector<double, std::allocator<double> >, std::vector<double, std::allocator<double> >, std::vector<double, std::allocator<double> >, std::string)[m[K’:
+[4.209s] [01m[K/home/luca/ur_ws/src/create_scene/src/scene_setup.cpp:11:72:[m[K [01;35m[Kwarning: [m[Kunused parameter ‘[01m[Kplanning_scene_interface[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-parameter-Wunused-parameter]8;;[m[K]
+[4.209s]    11 | void create_object([01;35m[Kmoveit::planning_interface::PlanningSceneInterface &planning_scene_interface[m[K,
+[4.209s]       |                    [01;35m[K~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[5.755s] [100%] [32m[1mLinking CXX executable scene[0m
+[5.903s] [100%] Built target scene
+[5.911s] Invoked command in '/home/luca/ur_ws/src/build/create_scene' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/luca/ur_ws/src/build/create_scene -- -j8 -l8
+[5.912s] Invoking command in '/home/luca/ur_ws/src/build/create_scene': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/luca/ur_ws/src/build/create_scene
+[5.917s] -- Install configuration: ""
+[5.917s] -- Execute custom install script
+[5.917s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/lib/create_scene/scene
+[5.923s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene//launch/create_scene.launch.py
+[5.930s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/ament_index/resource_index/package_run_dependencies/create_scene
+[5.940s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/ament_index/resource_index/parent_prefix_path/create_scene
+[5.946s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/environment/ament_prefix_path.sh
+[5.954s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/environment/ament_prefix_path.dsv
+[5.960s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/environment/path.sh
+[5.966s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/environment/path.dsv
+[5.972s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/local_setup.bash
+[5.978s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/local_setup.sh
+[5.985s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/local_setup.zsh
+[5.993s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/local_setup.dsv
+[5.999s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/package.dsv
+[6.007s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/ament_index/resource_index/packages/create_scene
+[6.012s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/cmake/create_sceneConfig.cmake
+[6.020s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/cmake/create_sceneConfig-version.cmake
+[6.025s] -- Symlinking: /home/luca/ur_ws/src/install/create_scene/share/create_scene/package.xml
+[6.036s] Invoked command in '/home/luca/ur_ws/src/build/create_scene' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/luca/ur_ws/src/build/create_scene

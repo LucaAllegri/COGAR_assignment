@@ -1,0 +1,1 @@
+/home/luca/ur_ws/src/build/create_scene/ament_cmake_core/create_sceneConfig-version.cmake

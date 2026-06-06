@@ -1,0 +1,17 @@
+/home/luca/ur_ws/src/install/create_scene/lib/create_scene/scene
+/home/luca/ur_ws/src/install/create_scene/share/create_scene//launch/create_scene.launch.py
+/home/luca/ur_ws/src/install/create_scene/share/ament_index/resource_index/package_run_dependencies/create_scene
+/home/luca/ur_ws/src/install/create_scene/share/ament_index/resource_index/parent_prefix_path/create_scene
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/environment/ament_prefix_path.sh
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/environment/ament_prefix_path.dsv
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/environment/path.sh
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/environment/path.dsv
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/local_setup.bash
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/local_setup.sh
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/local_setup.zsh
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/local_setup.dsv
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/package.dsv
+/home/luca/ur_ws/src/install/create_scene/share/ament_index/resource_index/packages/create_scene
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/cmake/create_sceneConfig.cmake
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/cmake/create_sceneConfig-version.cmake
+/home/luca/ur_ws/src/install/create_scene/share/create_scene/package.xml

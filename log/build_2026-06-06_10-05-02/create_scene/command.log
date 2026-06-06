@@ -1,0 +1,6 @@
+Invoking command in '/home/luca/ur_ws/src/build/create_scene': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/luca/ur_ws/src/create_scene -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/luca/ur_ws/src/install/create_scene
+Invoked command in '/home/luca/ur_ws/src/build/create_scene' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/luca/ur_ws/src/create_scene -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/luca/ur_ws/src/install/create_scene
+Invoking command in '/home/luca/ur_ws/src/build/create_scene': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/luca/ur_ws/src/build/create_scene -- -j8 -l8
+Invoked command in '/home/luca/ur_ws/src/build/create_scene' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/luca/ur_ws/src/build/create_scene -- -j8 -l8
+Invoking command in '/home/luca/ur_ws/src/build/create_scene': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/luca/ur_ws/src/build/create_scene
+Invoked command in '/home/luca/ur_ws/src/build/create_scene' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/luca/ur_ws/src/build/create_scene

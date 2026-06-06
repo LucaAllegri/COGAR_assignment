@@ -1,0 +1,4 @@
+Invoking command in '/home/luca/ur_ws/src/build/create_scene': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/luca/ur_ws/src/build/create_scene -- -j8 -l8
+Invoked command in '/home/luca/ur_ws/src/build/create_scene' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/luca/ur_ws/src/build/create_scene -- -j8 -l8
+Invoking command in '/home/luca/ur_ws/src/build/create_scene': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/luca/ur_ws/src/build/create_scene
+Invoked command in '/home/luca/ur_ws/src/build/create_scene' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/luca/ur_ws/src/build/create_scene

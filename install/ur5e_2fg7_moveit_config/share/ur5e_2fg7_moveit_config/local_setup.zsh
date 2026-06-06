@@ -1,0 +1,1 @@
+/home/luca/ur_ws/src/build/ur5e_2fg7_moveit_config/ament_cmake_environment_hooks/local_setup.zsh

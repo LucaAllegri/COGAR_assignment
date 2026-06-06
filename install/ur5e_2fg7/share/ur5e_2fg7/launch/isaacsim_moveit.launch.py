@@ -1,0 +1,1 @@
+/home/luca/ur_ws/src/ur5e_2fg7/launch/isaacsim_moveit.launch.py

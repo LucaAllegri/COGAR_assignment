@@ -1,0 +1,27 @@
+-- Install configuration: ""
+-- Execute custom install script
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7//urdf/ur5e_2fg7.ros2_control.xacro
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7//urdf/ur5e_2fg7_description_only.urdf.xacro
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7//urdf/ur5e_2fg7_final.urdf
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7//urdf/ur5e_2fg7_main.urdf
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7//urdf/ur5e_2fg7_main.urdf.xacro
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7//launch/isaacsim_moveit.launch.py
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7//launch/view_robot.launch.py
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7//config/moveit_controllers.yaml
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7//config/ros2_controllers.yaml
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7//config/view_robot.rviz
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ament_index/resource_index/package_run_dependencies/ur5e_2fg7
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ament_index/resource_index/parent_prefix_path/ur5e_2fg7
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/environment/ament_prefix_path.sh
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/environment/ament_prefix_path.dsv
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/environment/path.sh
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/environment/path.dsv
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/local_setup.bash
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/local_setup.sh
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/local_setup.zsh
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/local_setup.dsv
+-- Symlinking: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/package.dsv
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ament_index/resource_index/packages/ur5e_2fg7
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/cmake/ur5e_2fg7Config.cmake
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/cmake/ur5e_2fg7Config-version.cmake
+-- Up-to-date symlink: /home/luca/ur_ws/src/install/ur5e_2fg7/share/ur5e_2fg7/package.xml
