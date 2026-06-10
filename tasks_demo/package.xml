@@ -1,21 +1,24 @@
 <?xml version="1.0"?>
-<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>tasks_demo</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="luca.allegri02@gmail.com">luca</maintainer>
-  <license>TODO: License declaration</license>
+  <description>Task-level demos for the COGAR B1 assignment with UR5e and OnRobot 2FG7.</description>
+
+  <maintainer email="luca@example.com">luca</maintainer>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>moveit_planning</depend>
   <depend>rclcpp</depend>
-  <depend>moveit_ros_planning_interface</depend>
-  <depend>moveit_msgs</depend>
-  <depend>geometry_msgs</depend>
-  <depend>trajectory_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>geometry_msgs</depend>
+
+  <depend>moveit_msgs</depend>
+  <depend>moveit_ros_planning_interface</depend>
+
+  <depend>moveit_planning</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

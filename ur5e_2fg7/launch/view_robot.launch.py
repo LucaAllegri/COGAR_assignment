@@ -30,13 +30,14 @@ def generate_launch_description():
             name="joint_state_publisher_gui",
             parameters=[{
                 'zeros': {
-                    'shoulder_pan_joint': 0.0,
-                    'shoulder_lift_joint': -1.5708,
-                    'elbow_joint': 0.0,
-                    'wrist_1_joint': -1.5708,
-                    'wrist_2_joint': 0.0,
-                    'wrist_3_joint': 0.0,
-                    'gripper_gripper_joint': 0.000
+                    'shoulder_pan_joint': -1.55334,
+                    'shoulder_lift_joint': -1.97222,
+                    'elbow_joint': 1.88496,
+                    'wrist_1_joint': -1.48353,
+                    'wrist_2_joint': -1.5708,
+                    'wrist_3_joint': -1.55334,
+                    'gripper_gripper_joint': 0.030,
+                    'gripper_right_finger_joint': 0.030,
                 }
             }]
         ),

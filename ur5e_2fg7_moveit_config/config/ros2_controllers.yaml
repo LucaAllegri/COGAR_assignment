@@ -8,6 +8,10 @@ controller_manager:
     ur_manipulator_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+    gripper_position_controller:
+      type: position_controllers/JointGroupPositionController
+
+
 ur_manipulator_controller:
   ros__parameters:
     joints:
@@ -28,3 +32,10 @@ ur_manipulator_controller:
     state_publish_rate: 100.0
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
+
+
+gripper_position_controller:
+  ros__parameters:
+    joints:
+      - gripper_gripper_joint
+      - gripper_right_finger_joint

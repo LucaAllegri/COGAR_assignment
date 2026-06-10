@@ -16,8 +16,7 @@
     visual_parameters_file="/opt/ros/humble/share/ur_description/config/ur5e/visual_parameters.yaml"
     use_fake_hardware="true"
     fake_sensor_commands="false"
-    initial_positions="${dict(shoulder_pan_joint=0.0,shoulder_lift_joint=-1.57,elbow_joint=1.57,wrist_1_joint=-1.57,wrist_2_joint=-1.57,wrist_3_joint=0.0)}">
-    <origin xyz="0 0 0" rpy="0 0 0"/>
+    initial_positions="${dict(shoulder_pan_joint=-1.55334,shoulder_lift_joint=-1.97222,elbow_joint=1.88496,wrist_1_joint=-1.48353,wrist_2_joint=-1.5708,wrist_3_joint=-1.55334)}">    <origin xyz="0 0 0" rpy="0 0 0"/>
   </xacro:ur_robot>
 
   <xacro:onrobot_2fg7 parent="tool0" prefix="gripper_">
