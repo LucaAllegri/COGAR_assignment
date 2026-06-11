@@ -101,7 +101,18 @@ int main(int argc, char **argv){
 
     double gripper_motion_duration = node->declare_parameter<double>("gripper_motion_duration",1.0);
 
-    int num_repetitions = node->declare_parameter<int>("num_repetitions",1);
+    angles_box_pick[i] = node->declare_parameter<std::vector<double>>("angles_box_pick" + std::to_string(i),std::vector<double>{ 0.0, 0.0, 0.5 });
+    position_box_pick[i] = node->declare_parameter<std::vector<double>>("position_box_pick" + std::to_string(i),std::vector<double>{ -0.4, -1.1, 0.269 });
+
+    q_desire_box_pick.setRPY(0.0, 0.0, angles_box_pick[i][2]);
+    qEigen_desire_box_pick.x() = q_desire_box_pick.x();
+    qEigen_desire_box_pick.y() = q_desire_box_pick.y();
+    qEigen_desire_box_pick.z() = q_desire_box_pick.z();
+    qEigen_desire_box_pick.w() = q_desire_box_pick.w();
+    desire_box_pick[i].translation().x() = position_box_pick[i][0];
+    desire_box_pick[i].translation().y() = position_box_pick[i][1];
+    desire_box_pick[i].translation().z() =size_pallet_pick[2] + size_box[2] / 2 + ((level_box_pick[i]) * (size_box[2]));
+    desire_box_pick[i].linear() = qEigen_desire_box_pick.toRotationMatrix();
 
     std::vector<double> configuration_home = node->declare_parameter<std::vector<double>>("configuration_home",std::vector<double>{0.0, -1.57, 1.57, -1.57, -1.57, 0.0});
 

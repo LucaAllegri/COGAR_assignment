@@ -53,21 +53,18 @@ boxes.append(CollisionObject(shape_type=BOX,name="cabinet_boundary_3",size=[0.00
 #------------
 
 # Oggetto da graspare
-boxes.append(CollisionObject(shape_type=BOX,name="object_box",size=[0.060, 0.060, 0.120],position=[-0.500, 0.000, -0.142],orientation=[0.0, 0.0, 0.0],color=[0.0, 0.45, 1.0, 1.0],ref_link="base_link",))
+boxes.append(CollisionObject(shape_type=BOX,name="object_box",size=[0.040, 0.04, 0.1],position=[-0.500, -0.100, -0.032],orientation=[0.0, 0.0, 0.0],color=[0.0, 0.45, 1.0, 1.0],ref_link="base_link",))
 #------------
 
 # Piano del tavolo
-boxes.append(CollisionObject(shape_type=BOX,name="opposite_table_top",size=[0.500, 0.560, 0.050],position=[-0.500, 0.000, -0.192],orientation=[0.0, 0.0, 0.0],color=table_color,ref_link="base_link",))
+boxes.append(CollisionObject(shape_type=BOX,name="opposite_table_top",size=[0.500, 0.560, 0.050],position=[-0.500, 0.000, -0.082],orientation=[0.0, 0.0, 0.0],color=table_color,ref_link="base_link",))
 # Gambe del tavolo
-boxes.append(CollisionObject(shape_type=BOX,name="opposite_table_leg_1",size=[0.040, 0.040, 0.355],position=[-0.700, -0.235, -0.547],orientation=[0.0, 0.0, 0.0],color=table_color,ref_link="base_link",))
-boxes.append(CollisionObject(shape_type=BOX,name="opposite_table_leg_2",size=[0.040, 0.040, 0.355],position=[-0.700, 0.235, -0.547],orientation=[0.0, 0.0, 0.0],color=table_color,ref_link="base_link",))
-boxes.append(CollisionObject(shape_type=BOX,name="opposite_table_leg_3",size=[0.040, 0.040, 0.355],position=[-0.300, -0.235, -0.547],orientation=[0.0, 0.0, 0.0],color=table_color,ref_link="base_link",))
-boxes.append(CollisionObject(shape_type=BOX,name="opposite_table_leg_4",size=[0.040, 0.040, 0.355],position=[-0.300, 0.235, -0.547],orientation=[0.0, 0.0, 0.0],color=table_color,ref_link="base_link",))
+boxes.append(CollisionObject(shape_type=BOX,name="opposite_table_leg_1",size=[0.040, 0.040, 0.465],position=[-0.700, -0.235, -0.547],orientation=[0.0, 0.0, 0.0],color=table_color,ref_link="base_link",))
+boxes.append(CollisionObject(shape_type=BOX,name="opposite_table_leg_2",size=[0.040, 0.040, 0.465],position=[-0.700, 0.235, -0.547],orientation=[0.0, 0.0, 0.0],color=table_color,ref_link="base_link",))
+boxes.append(CollisionObject(shape_type=BOX,name="opposite_table_leg_3",size=[0.040, 0.040, 0.465],position=[-0.300, -0.235, -0.547],orientation=[0.0, 0.0, 0.0],color=table_color,ref_link="base_link",))
+boxes.append(CollisionObject(shape_type=BOX,name="opposite_table_leg_4",size=[0.040, 0.040, 0.465],position=[-0.300, 0.235, -0.547],orientation=[0.0, 0.0, 0.0],color=table_color,ref_link="base_link",))
 #------------
 
-# OSTACOLO
-boxes.append(CollisionObject(shape_type=CYLINDER,name="obstacle",size=[0.8, 0.03],position=[-0.350, 0.000, 0.24],orientation=[0.0, 0.0, 0.0],color=[1.0, 1.0, 0.0, 1.0],ref_link="base_link",))
-#------------
 
 def generate_launch_description():
 
