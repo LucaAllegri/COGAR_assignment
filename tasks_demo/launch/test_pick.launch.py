@@ -16,8 +16,8 @@ def generate_launch_description():
         "object_position": [-0.500, -0.100, -0.032],
         "object_size": [0.040, 0.040, 0.100],
 
-        "on_object_position": [-0.500, -0.100, 0.218],
-        "on_object_rpy": [3.14, 0.0, 0.0],
+        "on_object_position": [-0.500, -0.100, 0.200],
+        "on_object_rpy": [3.14,0.0,0.0],
     }
 
     params_robot = {

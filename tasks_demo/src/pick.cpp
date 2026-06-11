@@ -135,31 +135,68 @@ int main(int argc, char **argv){
 
     //******** CONFIG ROBOT INIZIALE 
 	std::vector<double> robot_config_start = node->declare_parameter<std::vector<double>>("start_config", std::vector<double>{0,-1.57,0.0,-1.57,0.0,0.0});
+    Eigen::Affine3d posa_robot_start; 
+    robot_planning.set_robot_state(robot_config_start);
 
     //******** CONFIG ROBOT SOPRA AL TAVOLO  
 	std::vector<double> robot_config_on_table = node->declare_parameter<std::vector<double>>("config_on_table", std::vector<double>{0.453786, -1.09956, -1.65806, -1.95477, 1.5708, 0.418879});
+    Eigen::Affine3d posa_robot_on_table; 
+    robot_planning.forward_kinematics(robot_config_on_table, posa_robot_on_table, "wrist_3_link");
+
+    std::vector<std::vector<double>> ik_solutions_start_table;
+
+    std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG INIZIALE -> CONFIG SOPRA TAVOLO: " << std::endl;
+
+	robot_planning.inverse_kinematics(posa_robot_on_table, ik_solutions_start_table,robot_config_start); 
 
     //******** CONFIG ROBOT SOPRA AL CABINET 
 	std::vector<double> robot_config_on_cabinet = node->declare_parameter<std::vector<double>>("config_on_cabinet", std::vector<double>{-0.715585, -2.37365, 1.74533, -0.942478, 4.72984, -0.680678});
+    Eigen::Affine3d posa_robot_on_cabinet; 
+    robot_planning.forward_kinematics(robot_config_on_cabinet, posa_robot_on_cabinet, "wrist_3_link");
 
+
+    //********************************************************************************
+    // MOVIMENTO DALLA CONFIGURAZIONE INIZIALE A QUELLA SOPRA AL TAVOLO
     trajectory_msgs::msg::JointTrajectory traj_start_to_on_table;
-    robot_planning.set_robot_state(robot_config_start);
 
-
-    if (!interpolation_trajectory(robot_config_on_table,robot_config_start,num_interpolations,traj_start_to_on_table,robot_planning)){
-        RCLCPP_ERROR(node->get_logger(),"Failed to plan trajectory from start_config to config_pre_pick.");
-        rclcpp::shutdown();
-        return 1;
+    for(int i=0; i<ik_solutions_start_table.size();i++){
+        if (interpolation_trajectory(ik_solutions_start_table[i], robot_config_start, num_interpolations, traj_start_to_on_table, robot_planning)){
+            robot_planning.execute_trajectory(traj_start_to_on_table);
+            rclcpp::sleep_for(std::chrono::seconds(5));
+            break;
+        }
     }
 
-    RCLCPP_INFO(node->get_logger(),"Trajectory from start_config to config_pre_pick found.");
+    //********************************************************************************
+    // MOVIMENTO DALLA CONFIGURAZIONE SOPRA AL TAVOLO A QUELLA SOPRA ALL'OGGETTO DA PRELEVARE
+    Eigen::Affine3d robot_pick_pose;
+	tf2::Quaternion q_robot_pick_pose;
+	Eigen::Quaterniond qEigen_robot_pick_pose;
+	q_robot_pick_pose.setRPY(on_object_rpy[0], on_object_rpy[1], on_object_rpy[2]);
+	qEigen_robot_pick_pose.x() = q_robot_pick_pose.x();
+	qEigen_robot_pick_pose.y() = q_robot_pick_pose.y();
+	qEigen_robot_pick_pose.z() = q_robot_pick_pose.z();
+	qEigen_robot_pick_pose.w() = q_robot_pick_pose.w();
+	robot_pick_pose.translation().x() = on_object_position[0];
+	robot_pick_pose.translation().y() = on_object_position[1];
+	robot_pick_pose.translation().z() = on_object_position[2];
+	robot_pick_pose.linear() = qEigen_robot_pick_pose.toRotationMatrix();
 
-    rclcpp::sleep_for(std::chrono::seconds(10));
+    std::vector<std::vector<double>> ik_solutions_table_object;
 
-    robot_planning.execute_trajectory(traj_start_to_on_table);
+    std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG SOPRA TAVOLO -> CONFIG SOPRA OGGETTO: " << std::endl;
 
-    rclcpp::sleep_for(std::chrono::seconds(5));
+	robot_planning.inverse_kinematics(robot_pick_pose, ik_solutions_table_object,robot_config_on_table); 
 
+    trajectory_msgs::msg::JointTrajectory traj_table_to_on_object;
+
+    for(int i=0; i<ik_solutions_table_object.size();i++){
+        if (interpolation_trajectory(ik_solutions_table_object[i], robot_config_on_table, num_interpolations, traj_table_to_on_object, robot_planning)){
+            robot_planning.execute_trajectory(traj_table_to_on_object);
+            rclcpp::sleep_for(std::chrono::seconds(5));
+            break;
+        }
+    }
 
     rclcpp::shutdown();
     return 0;
