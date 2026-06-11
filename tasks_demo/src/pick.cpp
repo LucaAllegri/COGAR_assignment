@@ -1,6 +1,8 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <moveit_planning/moveit_planning.hpp>
+#include <trajectory_msgs/msg/joint_trajectory.hpp>
+#include <trajectory_msgs/msg/joint_trajectory_point.hpp>
 
 #include <std_msgs/msg/float64_multi_array.hpp>
 
@@ -9,184 +11,155 @@
 #include <chrono>
 
 
-bool planAndExecute(moveit_planning &planner,
-                    const rclcpp::Node::SharedPtr &node,
-                    const std::vector<double> &target,
-                    const std::string &label){
-    trajectory_msgs::msg::JointTrajectory trajectory;
+bool interpolation_trajectory(std::vector<double> ik_solution, 
+							  std::vector<double> stato_iniziale,
+							  int num_interpolation,
+							  trajectory_msgs::msg::JointTrajectory &trajectory,
+							  moveit_planning& robot_planning){
 
-    RCLCPP_INFO(node->get_logger(),"Planning to %s configuration...",label.c_str());
+	int count_valid_interpolation;
+	bool find = false;
 
-    bool plan_ok = planner.plan_trajectory(target, trajectory, {});
+	std::vector<std::pair<std::string, std::string>> contact_pairs;
 
-    if (!plan_ok){
-        RCLCPP_ERROR(node->get_logger(),"Planning to %s failed.",label.c_str());
-        return false;
-    }
+	double alpha = 1.0 / num_interpolation;
 
-    RCLCPP_INFO(node->get_logger(),"Executing %s trajectory...",label.c_str());
+	std::vector<double> stato_finale =ik_solution;  
+	count_valid_interpolation=0;
 
-    bool exec_ok = planner.execute_trajectory(trajectory);
+	//stato iniziale e stato finale validi??
+	if (robot_planning.check_state_validity(stato_iniziale,contact_pairs) && robot_planning.check_state_validity(stato_finale,contact_pairs)) {
 
-    if (!exec_ok){
-        RCLCPP_ERROR(node->get_logger(),"Execution of %s trajectory failed.",label.c_str());
-        return false;
-    }
+		std::vector<std::vector<double>> correct_state_interpolate;
+		
+		for (int l = 1; l <= num_interpolation; l++) {
+			
+			std::vector<double> stato_interpolato;
+			for (int j = 0; j < stato_iniziale.size(); j++) {
+				double valore_interpolato = (1 - alpha * l) * stato_iniziale[j] + (alpha * l) * stato_finale[j];
+				stato_interpolato.push_back(valore_interpolato);
+			}
+			Eigen::Affine3d posa_punto_interpolato; 
+		
+			tf2::Quaternion q_punto_interpolato;
+			Eigen::Quaterniond qEigen_punto_interpolato;
+			q_punto_interpolato.setRPY(stato_interpolato[3], stato_interpolato[4], stato_interpolato[5]);
+			qEigen_punto_interpolato.x() = q_punto_interpolato.x();
+			qEigen_punto_interpolato.y() = q_punto_interpolato.y();
+			qEigen_punto_interpolato.z() = q_punto_interpolato.z();
+			qEigen_punto_interpolato.w() = q_punto_interpolato.w();
+			posa_punto_interpolato.translation().x() = stato_interpolato[0];
+			posa_punto_interpolato.translation().y() = stato_interpolato[1];
+			posa_punto_interpolato.translation().z() = stato_interpolato[2];
+			posa_punto_interpolato.linear() = qEigen_punto_interpolato.toRotationMatrix();
 
-    RCLCPP_INFO(node->get_logger(),"%s trajectory completed.",label.c_str());
+			robot_planning.forward_kinematics(stato_interpolato, posa_punto_interpolato, "wrist_3_link");
+			
+			Eigen::Matrix3d rotation_matrix = posa_punto_interpolato.linear();
+			Eigen::Vector3d x_axis = rotation_matrix.col(0); // Asse X della matrice di rotazione
+			Eigen::Vector3d y_axis = rotation_matrix.col(1); // Asse Y della matrice di rotazione
 
-    return true;
+			// Verifico la validità del punto interpolato
+			if (!robot_planning.check_state_validity(stato_interpolato,contact_pairs)) {
+				// Punto interpolato non valido
+				std::cout << "Interpolazione non valida al punto " << l << std::endl;
+				correct_state_interpolate.clear();
+				break;                
+			}else{
+				count_valid_interpolation++;
+				correct_state_interpolate.push_back(stato_interpolato);
+			}
+		}
+
+        if (count_valid_interpolation == num_interpolation){
+            trajectory.joint_names = {
+                "shoulder_pan_joint",
+                "shoulder_lift_joint",
+                "elbow_joint",
+                "wrist_1_joint",
+                "wrist_2_joint",
+                "wrist_3_joint"
+            };
+
+            trajectory.points.clear();
+
+            trajectory_msgs::msg::JointTrajectoryPoint start_point;
+            start_point.positions = stato_iniziale;
+            start_point.time_from_start = rclcpp::Duration::from_seconds(0.0);
+            trajectory.points.push_back(start_point);
+
+            for (size_t i = 0; i < correct_state_interpolate.size(); ++i){
+                trajectory_msgs::msg::JointTrajectoryPoint point;
+
+                point.positions = correct_state_interpolate[i];
+
+                double duration_seconds = 0.5 * static_cast<double>(i + 1);
+                point.time_from_start = rclcpp::Duration::from_seconds(duration_seconds);
+
+                trajectory.points.push_back(point);
+            }
+
+            return true;
+        }
+	}
+	return false;
 }
-
-
-void moveGripper(const rclcpp::Node::SharedPtr &node,
-                double position,
-                double duration_sec){
-    
-    auto publisher = node->create_publisher<std_msgs::msg::Float64MultiArray>("/gripper_position_controller/commands",10);
-
-    std_msgs::msg::Float64MultiArray msg;
-    msg.data = {position, position};
-
-    RCLCPP_INFO(node->get_logger(),"Commanding 2FG7 gripper position: %.4f",position);
-
-    rclcpp::Time start_time = node->now();
-
-    while (rclcpp::ok() && (node->now() - start_time).seconds() < duration_sec){
-        publisher->publish(msg);
-        rclcpp::spin_some(node);
-        rclcpp::sleep_for(std::chrono::milliseconds(100));
-    }
-}
-
-
-bool simulatedForceGrasp(const rclcpp::Node::SharedPtr &node,
-                        double target_force,
-                        double force_threshold){
-    RCLCPP_INFO(node->get_logger(),"Closing 2FG7 gripper in simulated force mode...");
-
-    RCLCPP_INFO(node->get_logger(),"Target force: %.2f N",target_force);
-
-    RCLCPP_INFO(node->get_logger(),"Force threshold: %.2f N",force_threshold);
-
-    if (target_force >= force_threshold){
-        RCLCPP_INFO(node->get_logger(),"Simulated force threshold reached. Grasp accepted.");
-        return true;
-    }
-
-    RCLCPP_WARN(node->get_logger(),"Simulated force threshold not reached. Grasp rejected.");
-
-    return false;
-}
-
 
 int main(int argc, char **argv){
     rclcpp::init(argc, argv);
 
-    auto node = rclcpp::Node::make_shared("test_pick_node");
+    auto const node = rclcpp::Node::make_shared("test_pick");
+    auto const move_group_node = std::make_shared<rclcpp::Node>("move_group_node");
+
+    rclcpp::executors::SingleThreadedExecutor executor;
+	executor.add_node(move_group_node);
+	std::thread([&executor]()
+				{ executor.spin(); })
+		.detach();
+
+	moveit_planning robot_planning =(move_group_node);
 
     std::string planning_group = node->declare_parameter<std::string>("planning_group","ur_manipulator");
 
+    //******** CONFIG OGGETTO
     std::string object_name = node->declare_parameter<std::string>("object_name","object_box");
+    std::vector<double> object_size = node->declare_parameter<std::vector<double>>("object_size",std::vector<double>{0.040, 0.040, 0.100});
+    std::vector<double> object_position = node->declare_parameter<std::vector<double>>("object_position",std::vector<double>{-0.500, -0.100, -0.032});
+    
+    std::vector<double> on_object_position = node->declare_parameter<std::vector<double>>("on_object_position",std::vector<double>{-0.500, -0.100, 0.218});
+    std::vector<double> on_object_rpy = node->declare_parameter<std::vector<double>>("on_object_rpy",std::vector<double>{3.14, 0.0, 0.0});
 
-    std::string gripper_link = node->declare_parameter<std::string>("gripper_link","gripper_base_link");
 
-    double target_force = node->declare_parameter<double>("target_force",40.0);
+    //******** NUM INTERPOLAZIONI
+    int num_interpolations = node->declare_parameter<int>("num_interpolazioni",10);
 
-    double force_threshold = node->declare_parameter<double>("force_threshold",30.0);
+    //******** CONFIG ROBOT INIZIALE 
+	std::vector<double> robot_config_start = node->declare_parameter<std::vector<double>>("start_config", std::vector<double>{0,-1.57,0.0,-1.57,0.0,0.0});
 
-    double gripper_open_position = node->declare_parameter<double>("gripper_open_position",0.030);
+    //******** CONFIG ROBOT SOPRA AL TAVOLO  
+	std::vector<double> robot_config_on_table = node->declare_parameter<std::vector<double>>("config_on_table", std::vector<double>{0.453786, -1.09956, -1.65806, -1.95477, 1.5708, 0.418879});
 
-    double gripper_closed_position = node->declare_parameter<double>("gripper_closed_position",0.005);
+    //******** CONFIG ROBOT SOPRA AL CABINET 
+	std::vector<double> robot_config_on_cabinet = node->declare_parameter<std::vector<double>>("config_on_cabinet", std::vector<double>{-0.715585, -2.37365, 1.74533, -0.942478, 4.72984, -0.680678});
 
-    double gripper_motion_duration = node->declare_parameter<double>("gripper_motion_duration",1.0);
+    trajectory_msgs::msg::JointTrajectory traj_start_to_on_table;
+    robot_planning.set_robot_state(robot_config_start);
 
-    angles_box_pick[i] = node->declare_parameter<std::vector<double>>("angles_box_pick" + std::to_string(i),std::vector<double>{ 0.0, 0.0, 0.5 });
-    position_box_pick[i] = node->declare_parameter<std::vector<double>>("position_box_pick" + std::to_string(i),std::vector<double>{ -0.4, -1.1, 0.269 });
 
-    q_desire_box_pick.setRPY(0.0, 0.0, angles_box_pick[i][2]);
-    qEigen_desire_box_pick.x() = q_desire_box_pick.x();
-    qEigen_desire_box_pick.y() = q_desire_box_pick.y();
-    qEigen_desire_box_pick.z() = q_desire_box_pick.z();
-    qEigen_desire_box_pick.w() = q_desire_box_pick.w();
-    desire_box_pick[i].translation().x() = position_box_pick[i][0];
-    desire_box_pick[i].translation().y() = position_box_pick[i][1];
-    desire_box_pick[i].translation().z() =size_pallet_pick[2] + size_box[2] / 2 + ((level_box_pick[i]) * (size_box[2]));
-    desire_box_pick[i].linear() = qEigen_desire_box_pick.toRotationMatrix();
-
-    std::vector<double> configuration_home = node->declare_parameter<std::vector<double>>("configuration_home",std::vector<double>{0.0, -1.57, 1.57, -1.57, -1.57, 0.0});
-
-    std::vector<double> configuration_pre_pick = node->declare_parameter<std::vector<double>>("configuration_pre_pick",std::vector<double>{-0.8, -1.3, 1.4, -1.7, -1.57, 0.3});
-
-    std::vector<double> configuration_lift = node->declare_parameter<std::vector<double>>("configuration_lift",std::vector<double>{-0.8, -1.20, 1.35, -1.65, -1.57, 0.3});
-
-    internal_planner_settings settings;
-    settings.num_attempts = 5;
-    settings.replan_attempts = 0;
-    settings.planning_time = 5.0;
-    settings.constrained_planning_time = 10.0;
-
-    moveit_planning planner(node, planning_group, settings);
-
-    int successful_trials = 0;
-
-    for (int trial = 0; trial < num_repetitions; trial++){
-        RCLCPP_INFO(node->get_logger(), "==============================");
-        RCLCPP_INFO(node->get_logger(),"Starting pick trial %d/%d",trial + 1,num_repetitions);
-        RCLCPP_INFO(node->get_logger(), "==============================");
-
-        bool ok_home = planAndExecute(planner,node,configuration_home,"home");
-
-        if (!ok_home){
-            RCLCPP_ERROR(node->get_logger(),"Trial %d failed at home motion.",trial + 1);
-            continue;
-        }
-
-        RCLCPP_INFO(node->get_logger(),"Opening gripper before approaching the object...");
-
-        moveGripper(node,gripper_open_position,gripper_motion_duration);
-
-        bool ok_pre_pick = planAndExecute(planner,node,configuration_pre_pick,"pre-pick");
-
-        if (!ok_pre_pick){
-            RCLCPP_ERROR(node->get_logger(),"Trial %d failed at pre-pick motion.",trial + 1);
-            continue;
-        }
-
-        bool grasp_ok = simulatedForceGrasp(node,target_force,force_threshold);
-
-        if (!grasp_ok){
-            RCLCPP_ERROR(node->get_logger(),"Trial %d failed: simulated force grasp rejected.",trial + 1);
-            continue;
-        }
-
-        RCLCPP_INFO(node->get_logger(),"Closing gripper on object...");
-
-        moveGripper(node,gripper_closed_position,gripper_motion_duration);
-
-        RCLCPP_INFO(node->get_logger(),"Attaching object '%s' to gripper link '%s'...",object_name.c_str(),gripper_link.c_str());
-
-        planner.attach_object(object_name, gripper_link);
-
-        bool ok_lift = planAndExecute(planner,node,configuration_lift,"lift");
-
-        if (!ok_lift){
-            RCLCPP_ERROR(node->get_logger(),"Trial %d failed at lift motion.",trial + 1);
-
-            planner.detach_object(object_name);
-            continue;
-        }
-
-        RCLCPP_INFO(node->get_logger(),"Pick trial %d completed successfully.",trial + 1);
-
-        successful_trials++;
+    if (!interpolation_trajectory(robot_config_on_table,robot_config_start,num_interpolations,traj_start_to_on_table,robot_planning)){
+        RCLCPP_ERROR(node->get_logger(),"Failed to plan trajectory from start_config to config_pre_pick.");
+        rclcpp::shutdown();
+        return 1;
     }
 
-    RCLCPP_INFO(node->get_logger(), "==============================");
-    RCLCPP_INFO(node->get_logger(), "Pick validation completed.");
-    RCLCPP_INFO(node->get_logger(),"Successful trials: %d/%d",successful_trials,num_repetitions
-    );
-    RCLCPP_INFO(node->get_logger(), "==============================");
+    RCLCPP_INFO(node->get_logger(),"Trajectory from start_config to config_pre_pick found.");
+
+    rclcpp::sleep_for(std::chrono::seconds(10));
+
+    robot_planning.execute_trajectory(traj_start_to_on_table);
+
+    rclcpp::sleep_for(std::chrono::seconds(5));
+
 
     rclcpp::shutdown();
     return 0;

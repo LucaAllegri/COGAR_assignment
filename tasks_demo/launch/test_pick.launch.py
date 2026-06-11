@@ -11,11 +11,17 @@ def generate_launch_description():
         .to_moveit_configs()
     )
 
+    params_object = {
+        "object_name": "object_box",
+        "object_position": [-0.500, -0.100, -0.032],
+        "object_size": [0.040, 0.040, 0.100],
+
+        "on_object_position": [-0.500, -0.100, 0.218],
+        "on_object_rpy": [3.14, 0.0, 0.0],
+    }
+
     params_robot = {
         "planning_group": "ur_manipulator",
-
-        # Object already present in create_scene_2.launch.py
-        "object_name": "object_box",
 
         # Link used to attach the object during simulated grasp
         "gripper_link": "gripper_base_link",
@@ -27,35 +33,35 @@ def generate_launch_description():
         "gripper_open_position": 0.030,
         "gripper_closed_position": 0.005,
         "gripper_motion_duration": 1.0,
+    }
 
-        # Number of repetitions for reliability test
-        "num_repetitions": 1,
 
-        # Joint-space configurations for UR5e
-        "configuration_home": [
-            -1.55334, -1.97222, 1.88496, -1.48353, -1.5708, -1.55334
-        ],
+    configs = {
+        "start_config": [0,-1.57,0.0,-1.57,0.0,0.0],
+        "config_on_table": [0.453786, -1.09956, -1.65806, -1.95477, 1.5708, 0.418879],
+        "config_on_cabinet" : [-0.715585, -2.37365, 1.74533, -0.942478, 4.72984, -0.680678],
+    }
 
-        "configuration_pre_pick": [
-            -0.331613, -1.67552, 2.18166, -2.0944, -1.5708, -0.331613
-        ],
-
-        "configuration_lift": [
-            -0.331613, -1.67552, 2.18166, -2.0944, -1.5708, -0.331613
-        ],
+    params_usefull = {
+        "use_bin": True,
+        "num_interpolations": 20,
+        "hard_scene": False,
     }
 
     return LaunchDescription([
         Node(
             package="tasks_demo",
             executable="pick",
-            name="test_pick_node",
+            name="test_pick",
             output="screen",
             parameters=[
                 moveit_config.robot_description,
                 moveit_config.robot_description_semantic,
                 moveit_config.robot_description_kinematics,
                 params_robot,
+                params_object,
+                params_usefull,
+                configs,
             ],
         )
     ])

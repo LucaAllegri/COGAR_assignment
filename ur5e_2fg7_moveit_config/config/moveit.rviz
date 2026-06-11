@@ -179,7 +179,7 @@ Visualization Manager:
         Interactive Marker Size: 0
         Joint Violation Color: 255; 0; 255
         Planning Group: ur_manipulator
-        Query Goal State: true
+        Query Goal State: false
         Query Start State: false
         Show Workspace: false
         Start State Alpha: 0
@@ -429,10 +429,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.2597975730895996
+      Pitch: 0.4197971224784851
       Target Frame: world
       Value: Orbit (rviz_default_plugins)
-      Yaw: 5.275190353393555
+      Yaw: 4.765195846557617
     Saved: ~
 Window Geometry:
   Displays:

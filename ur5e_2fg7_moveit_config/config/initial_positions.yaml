@@ -1,12 +1,12 @@
 # Default initial positions for ur5e_con_2fg7's ros2_control fake system
 
 initial_positions:
-  shoulder_pan_joint: -1.55334
-  shoulder_lift_joint: -1.97222
-  elbow_joint: 1.88496
-  wrist_1_joint: -1.48353
-  wrist_2_joint: -1.5708
-  wrist_3_joint: -1.55334
+  shoulder_pan_joint: 0.0
+  shoulder_lift_joint: -1.5708
+  elbow_joint: 0.0
+  wrist_1_joint: -1.5708
+  wrist_2_joint: 0.0
+  wrist_3_joint: 0.0
   
   # 2FG7 gripper joints
   gripper_gripper_joint: 0.03
