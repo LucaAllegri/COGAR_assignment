@@ -10,6 +10,25 @@
 #include <vector>
 #include <chrono>
 
+void command_gripper(const rclcpp::Node::SharedPtr& node,
+                     double position,
+                     double duration_seconds){
+    auto gripper_pub = node->create_publisher<std_msgs::msg::Float64MultiArray>("/gripper_position_controller/commands",10);
+
+    rclcpp::sleep_for(std::chrono::milliseconds(500));
+
+    std_msgs::msg::Float64MultiArray msg;
+
+    msg.data = {position, position};
+
+    for (int i = 0; i < 5; ++i){
+        gripper_pub->publish(msg);
+        rclcpp::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    rclcpp::sleep_for(std::chrono::milliseconds(static_cast<int>(duration_seconds * 1000.0)));
+}
+
 
 bool interpolation_trajectory(std::vector<double> ik_solution, 
 							  std::vector<double> stato_iniziale,
@@ -129,10 +148,6 @@ int main(int argc, char **argv){
     std::vector<double> on_object_position = node->declare_parameter<std::vector<double>>("on_object_position",std::vector<double>{-0.500, -0.100, 0.218});
     std::vector<double> on_object_rpy = node->declare_parameter<std::vector<double>>("on_object_rpy",std::vector<double>{3.14, 0.0, 0.0});
 
-
-    //******** NUM INTERPOLAZIONI
-    int num_interpolations = node->declare_parameter<int>("num_interpolazioni",10);
-
     //******** CONFIG ROBOT INIZIALE 
 	std::vector<double> robot_config_start = node->declare_parameter<std::vector<double>>("start_config", std::vector<double>{0,-1.57,0.0,-1.57,0.0,0.0});
     Eigen::Affine3d posa_robot_start; 
@@ -142,18 +157,29 @@ int main(int argc, char **argv){
 	std::vector<double> robot_config_on_table = node->declare_parameter<std::vector<double>>("config_on_table", std::vector<double>{0.453786, -1.09956, -1.65806, -1.95477, 1.5708, 0.418879});
     Eigen::Affine3d posa_robot_on_table; 
     robot_planning.forward_kinematics(robot_config_on_table, posa_robot_on_table, "wrist_3_link");
-
-    std::vector<std::vector<double>> ik_solutions_start_table;
-
-    std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG INIZIALE -> CONFIG SOPRA TAVOLO: " << std::endl;
-
-	robot_planning.inverse_kinematics(posa_robot_on_table, ik_solutions_start_table,robot_config_start); 
-
+    
     //******** CONFIG ROBOT SOPRA AL CABINET 
 	std::vector<double> robot_config_on_cabinet = node->declare_parameter<std::vector<double>>("config_on_cabinet", std::vector<double>{-0.715585, -2.37365, 1.74533, -0.942478, 4.72984, -0.680678});
     Eigen::Affine3d posa_robot_on_cabinet; 
     robot_planning.forward_kinematics(robot_config_on_cabinet, posa_robot_on_cabinet, "wrist_3_link");
 
+
+    //******** NUM INTERPOLAZIONI
+    int num_interpolations = node->declare_parameter<int>("num_interpolazioni",10);
+
+    //******** GRIPPER
+    double gripper_open_position = node->declare_parameter<double>("gripper_open_position", 0.030);
+    double gripper_closed_position = node->declare_parameter<double>("gripper_closed_position", 0.026);
+    double gripper_motion_duration =node->declare_parameter<double>("gripper_motion_duration", 1.0);
+    std::string gripper_link = node->declare_parameter<std::string>("gripper_link", "gripper_base_link");
+
+
+    // start
+    std::vector<std::vector<double>> ik_solutions_start_table;
+
+    std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG INIZIALE -> CONFIG SOPRA TAVOLO: " << std::endl;
+
+	robot_planning.inverse_kinematics(posa_robot_on_table, ik_solutions_start_table,robot_config_start); 
 
     //********************************************************************************
     // MOVIMENTO DALLA CONFIGURAZIONE INIZIALE A QUELLA SOPRA AL TAVOLO
@@ -189,14 +215,69 @@ int main(int argc, char **argv){
 	robot_planning.inverse_kinematics(robot_pick_pose, ik_solutions_table_object,robot_config_on_table); 
 
     trajectory_msgs::msg::JointTrajectory traj_table_to_on_object;
+    std::vector<double> on_object_config;
 
     for(int i=0; i<ik_solutions_table_object.size();i++){
         if (interpolation_trajectory(ik_solutions_table_object[i], robot_config_on_table, num_interpolations, traj_table_to_on_object, robot_planning)){
+            on_object_config = ik_solutions_table_object[i];
             robot_planning.execute_trajectory(traj_table_to_on_object);
             rclcpp::sleep_for(std::chrono::seconds(5));
             break;
         }
     }
+
+    //********************************************************************************
+    // GRASPING DELL'OGGETTO
+    RCLCPP_INFO(node->get_logger(), "Closing gripper...");
+
+    command_gripper(node,gripper_closed_position,gripper_motion_duration);
+
+    RCLCPP_INFO(node->get_logger(), "Gripper closed.");
+
+    RCLCPP_INFO(node->get_logger(),"Attaching object '%s' to link '%s'...",object_name.c_str(),gripper_link.c_str());
+
+    robot_planning.attach_object(object_name, gripper_link);
+
+    rclcpp::sleep_for(std::chrono::milliseconds(500));
+
+    robot_planning.print_attached_objects();
+
+    RCLCPP_INFO(node->get_logger(), "Object attached.");
+
+
+    //********************************************************************************
+    // MOVIMENTO DALLA CONFIGURAZIONE SOPRA ALL'OGGETTO (GRASPATO) A QUELLA SOPRA AL TAVOLO 
+
+    
+    trajectory_msgs::msg::JointTrajectory reverse_traj_back_to_table;
+
+    if(interpolation_trajectory(robot_config_on_table,on_object_config, num_interpolations, reverse_traj_back_to_table, robot_planning)){
+        robot_planning.execute_trajectory(reverse_traj_back_to_table);
+    }
+
+    //********************************************************************************
+    // MOVIMENTO DALLA CONFIGURAZIONE SOPRA ALL'OGGETTO (GRASPATO) A QUELLA SOPRA AL TAVOLO 
+    std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG SOPRA AL TAVOLO -> CONFIG SOPRA AL CABINET: " << std::endl;
+    std::vector<std::vector<double>> ik_solutions_table_cabinet;
+	robot_planning.inverse_kinematics(posa_robot_on_cabinet, ik_solutions_table_cabinet,robot_config_on_table); 
+
+    trajectory_msgs::msg::JointTrajectory traj_table_to_on_cabinet;
+
+    for(int i=0; i<ik_solutions_table_cabinet.size();i++){
+        if (interpolation_trajectory(ik_solutions_table_cabinet[i], robot_config_on_table, num_interpolations, traj_table_to_on_cabinet, robot_planning)){
+            robot_planning.execute_trajectory(traj_table_to_on_cabinet);
+            rclcpp::sleep_for(std::chrono::seconds(5));
+            break;
+        }
+    }
+
+
+    //********************************************************************************
+    // MOVIMENTO DALLA CONFIGURAZIONE SOPRA ALL'OGGETTO (GRASPATO) A QUELLA SOPRA AL TAVOLO 
+
+
+    //********************************************************************************
+    // MOVIMENTO DALLA CONFIGURAZIONE SOPRA ALL'OGGETTO (GRASPATO) A QUELLA SOPRA AL TAVOLO 
 
     rclcpp::shutdown();
     return 0;

@@ -23,24 +23,24 @@ def generate_launch_description():
     params_robot = {
         "planning_group": "ur_manipulator",
 
-        # Link used to attach the object during simulated grasp
-        "gripper_link": "gripper_base_link",
-
         # Simulated force-grasp threshold
         "target_force": 40.0,
         "force_threshold": 30.0,
-
-        "gripper_open_position": 0.030,
-        "gripper_closed_position": 0.005,
-        "gripper_motion_duration": 1.0,
     }
 
+    params_gripper = {
+        "gripper_open_position": 0.030,
+        "gripper_closed_position": 0.026,
+        "gripper_motion_duration": 1.0,
+        "gripper_link": "gripper_base_link", # link used to attach the object during simulated grasp
+    }
 
     configs = {
         "start_config": [0,-1.57,0.0,-1.57,0.0,0.0],
         "config_on_table": [0.453786, -1.09956, -1.65806, -1.95477, 1.5708, 0.418879],
         "config_on_cabinet" : [-0.715585, -2.37365, 1.74533, -0.942478, 4.72984, -0.680678],
     }
+
 
     params_usefull = {
         "use_bin": True,
@@ -62,6 +62,7 @@ def generate_launch_description():
                 params_object,
                 params_usefull,
                 configs,
+                params_gripper,
             ],
         )
     ])
