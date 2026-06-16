@@ -11,6 +11,174 @@
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
+#include <cmath>
+
+bool contactWithDesiredObjectOnly(const std::vector<std::pair<std::string, std::string>> &contact_pairs, const std::string &contact_object,const std::string &object_name){
+    bool desired_contact_found = false;
+
+    for (const auto &pair : contact_pairs) {
+
+        std::cout << "Contact pair: " << pair.first << " - " << pair.second << std::endl;
+
+        bool involves_contact_object = (pair.first == contact_object || pair.second == contact_object);
+
+        bool involves_grasped_object = (pair.first == object_name || pair.second == object_name);
+
+        if (involves_contact_object && involves_grasped_object) {
+            desired_contact_found = true;
+        } else {
+            return false; //c'è collisione
+        }
+    }
+
+    return desired_contact_found;
+}
+
+
+bool plan_vertical_cartesian_until_contact_from_state(const Eigen::Affine3d &start_pose,const std::vector<double> &start_config,double target_search_z,const std::string &contact_object,const std::string &object_name,double eef_step,double penetration,trajectory_msgs::msg::JointTrajectory &trajectory,moveit_planning &robot_planning){
+    if (start_config.size() != 6) {
+        std::cout << "Invalid start_config size: " << start_config.size() << std::endl;
+        return false;
+    }
+
+    double start_z = start_pose.translation().z();
+    double dz_total = target_search_z - start_z;
+
+    if (dz_total >= 0.0) {
+        std::cout << "Target z is not below start z. No vertical descent needed." << std::endl;
+        return false;
+    }
+
+    int n_steps = static_cast<int>(std::ceil(std::abs(dz_total) / eef_step));
+
+    if (n_steps < 1) {
+        n_steps = 1;
+    }
+
+    trajectory.joint_names = {
+        "shoulder_pan_joint",
+        "shoulder_lift_joint",
+        "elbow_joint",
+        "wrist_1_joint",
+        "wrist_2_joint",
+        "wrist_3_joint"
+    };
+
+    trajectory.points.clear();
+
+    trajectory_msgs::msg::JointTrajectoryPoint start_point;
+    start_point.positions = start_config;
+    start_point.time_from_start = rclcpp::Duration::from_seconds(0.0);
+    trajectory.points.push_back(start_point);
+
+    std::vector<double> previous_config = start_config;
+
+    double accumulated_penetration = 0.0;
+    bool contact_found = false;
+
+    for (int step = 1; step <= n_steps; step++) {
+
+        double alpha = static_cast<double>(step) / static_cast<double>(n_steps);
+
+        Eigen::Affine3d waypoint_pose = start_pose;
+        waypoint_pose.translation().z() = start_z + alpha * dz_total;
+
+        std::cout << "Checking vertical waypoint "<< step << "/" << n_steps<< " z = " << waypoint_pose.translation().z()<< std::endl;
+
+        std::vector<std::vector<double>> ik_solutions;
+        robot_planning.inverse_kinematics(waypoint_pose,ik_solutions,previous_config);
+
+        if (ik_solutions.empty()) {
+            std::cout << "No IK solution for vertical waypoint." << std::endl;
+            return false;
+        }
+
+        bool waypoint_accepted = false;
+
+        for (size_t i = 0; i < ik_solutions.size(); i++) {
+
+            std::vector<double> candidate_config = ik_solutions[i];
+
+            std::vector<std::pair<std::string, std::string>> contact_pairs;
+
+            bool state_valid = robot_planning.check_state_validity(candidate_config,contact_pairs);
+
+            if (state_valid) {
+
+                trajectory_msgs::msg::JointTrajectoryPoint point;
+                point.positions = candidate_config;
+                point.time_from_start = rclcpp::Duration::from_seconds(0.25 * static_cast<double>(trajectory.points.size()));
+
+                trajectory.points.push_back(point);
+
+                previous_config = candidate_config;
+                waypoint_accepted = true;
+                break;
+            }
+
+            // Se lo stato non è valido, controllo se è la collisione desiderata:
+            // object_box - basket_bottom
+            bool desired_contact = contactWithDesiredObjectOnly(contact_pairs,contact_object,object_name);
+
+            if (desired_contact) {
+
+                std::cout << "Desired contact detected with " << contact_object << std::endl;
+
+                trajectory_msgs::msg::JointTrajectoryPoint point;
+                point.positions = candidate_config;
+                point.time_from_start = rclcpp::Duration::from_seconds(0.25 * static_cast<double>(trajectory.points.size()));
+
+                trajectory.points.push_back(point);
+
+                previous_config = candidate_config;
+                waypoint_accepted = true;
+                contact_found = true;
+
+                break;
+
+            } else {
+                std::cout << "Invalid collision for this waypoint." << std::endl;
+                continue;
+            }
+        }
+
+        if (!waypoint_accepted) {
+            std::cout << "No valid IK solution for this vertical waypoint." << std::endl;
+            return false;
+        }
+
+        if (contact_found) {
+            accumulated_penetration += eef_step;
+
+            if (accumulated_penetration >= penetration) {
+                std::cout << "Stopping trajectory after desired contact." << std::endl;
+                return true;
+            }
+
+            return true;
+        }
+    }
+
+    std::cout << "Reached search z without detecting desired contact." << std::endl;
+    return false;
+}
+
+geometry_msgs::msg::Pose eigenToPose(const Eigen::Affine3d &pose_eigen){
+    geometry_msgs::msg::Pose pose_msg;
+
+    pose_msg.position.x = pose_eigen.translation().x();
+    pose_msg.position.y = pose_eigen.translation().y();
+    pose_msg.position.z = pose_eigen.translation().z();
+
+    Eigen::Quaterniond q(pose_eigen.linear());
+
+    pose_msg.orientation.x = q.x();
+    pose_msg.orientation.y = q.y();
+    pose_msg.orientation.z = q.z();
+    pose_msg.orientation.w = q.w();
+
+    return pose_msg;
+}
 
 void command_gripper(const rclcpp::Node::SharedPtr& node,
                      double position,
@@ -174,6 +342,7 @@ int main(int argc, char **argv){
     int num_interpolations = node->declare_parameter<int>("num_interpolations",20);
     double offset_obj_basket = node->declare_parameter<double>("distance_obj_basket",0.080);
     double wall_margin = node->declare_parameter<double>("wall_margin",0.08);
+    std::string basket_contact_object = node->declare_parameter<std::string>("basket_contact_object", "basket_bottom");
 
     //******** GRIPPER
     double gripper_open_position = node->declare_parameter<double>("gripper_open_position", 0.030);
@@ -191,6 +360,8 @@ int main(int argc, char **argv){
 
     //********************************************************************************
     // MOVIMENTO DALLA CONFIGURAZIONE INIZIALE A QUELLA SOPRA AL TAVOLO
+    //********************************************************************************
+
     trajectory_msgs::msg::JointTrajectory traj_start_to_on_table;
 
     for(int i=0; i<ik_solutions_start_table.size();i++){
@@ -203,6 +374,8 @@ int main(int argc, char **argv){
 
     //********************************************************************************
     // MOVIMENTO DALLA CONFIGURAZIONE SOPRA AL TAVOLO A QUELLA SOPRA ALL'OGGETTO DA PRELEVARE
+    //********************************************************************************
+
     Eigen::Affine3d robot_pick_pose;
 	tf2::Quaternion q_robot_pick_pose;
 	Eigen::Quaterniond qEigen_robot_pick_pose;
@@ -236,6 +409,8 @@ int main(int argc, char **argv){
 
     //********************************************************************************
     // GRASPING DELL'OGGETTO
+    //********************************************************************************
+
     RCLCPP_INFO(node->get_logger(), "Closing gripper...");
 
     command_gripper(node,gripper_closed_position,gripper_motion_duration);
@@ -255,7 +430,7 @@ int main(int argc, char **argv){
 
     //********************************************************************************
     // MOVIMENTO DALLA CONFIGURAZIONE SOPRA ALL'OGGETTO (GRASPATO) A QUELLA SOPRA AL TAVOLO 
-
+    //********************************************************************************
     
     trajectory_msgs::msg::JointTrajectory reverse_traj_back_to_table;
 
@@ -264,7 +439,9 @@ int main(int argc, char **argv){
     }
 
     //********************************************************************************
-    // MOVIMENTO DALLA CONFIGURAZIONE SOPRA ALL'OGGETTO (GRASPATO) A QUELLA SOPRA AL CABINET 
+    // MOVIMENTO DALLA CONFIGURAZIONE SOPRA AL TAVOLO A QUELLA SOPRA AL CABINET
+    //********************************************************************************
+
     std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG SOPRA AL TAVOLO -> CONFIG SOPRA AL CABINET: " << std::endl;
     std::vector<std::vector<double>> ik_solutions_table_cabinet;
 	robot_planning.inverse_kinematics(posa_robot_on_cabinet, ik_solutions_table_cabinet,robot_config_on_table); 
@@ -290,9 +467,16 @@ int main(int argc, char **argv){
         }
     }
 
+    if (!reached_cabinet) {
+        RCLCPP_ERROR(node->get_logger(), "Could not reach cabinet pose.");
+        rclcpp::shutdown();
+        return 1;
+    }
 
     //********************************************************************************
-    // MOVIMENTO DALLA CONFIGURAZIONE SOPRA ALL'OGGETTO (GRASPATO) A QUELLA SOPRA AL TAVOLO 
+    // MOVIMENTO DALLA CONFIGURAZIONE DA SOPRA AL CABINET A DENTRO ALLA CESTA
+    //********************************************************************************
+
     std::cout << "SOLUZIONI INVERSE KINEMATICS CONFIG SOPRA AL CABINET -> CONFIG DENTRO ALLA CESTA: " << std::endl;
     // Random drop position around the nominal cabinet pose
     std::srand(std::time(nullptr));
@@ -302,27 +486,25 @@ int main(int argc, char **argv){
     // Offset verticale tra EE e centro oggetto durante il grasp.
     double ee_object_offset_z = ee_z_at_pick - object_position[2];
 
-    std::cout << "EE-object vertical offset: " << ee_object_offset_z << std::endl;
-
-    // Calcolo quota dentro alla cesta
-
     // Superficie superiore del fondo della cesta
-    double basket_bottom_surface_z = basket_pos[2] + basket_size[3] / 2.0;
+    double basket_surface_z = basket_pos[2] + basket_size[3] / 2.0;
 
     // Quota desiderata del centro dell'oggetto durante il place
-    double object_center_target_z = basket_bottom_surface_z + object_size[2] / 2.0 + offset_obj_basket;
+    double object_center_pre_place_z = basket_surface_z + object_size[2] / 2.0 + offset_obj_basket;
 
     // Quota desiderata dell'EE durante il place
-    double target_ee_z = object_center_target_z + ee_object_offset_z;
+    double target_ee_pre_place_z = object_center_pre_place_z + ee_object_offset_z;
 
-    std::cout << "Basket bottom surface z: " << basket_bottom_surface_z << std::endl;
-    std::cout << "Object center target z: " << object_center_target_z << std::endl;
-    std::cout << "Target EE z inside basket: " << target_ee_z << std::endl;
+    // Quota teorica di contatto: fondo oggetto alla quota della superficie del basket.
+    double object_contact_target_z = basket_surface_z + object_size[2] / 2.0;
+    double target_ee_contact_z = object_contact_target_z + ee_object_offset_z;
 
-    // --------------------
-    // Limiti random dentro la cesta
-    // --------------------
+    std::cout << "EE-object vertical offset: " << ee_object_offset_z << std::endl;
+    std::cout << "Basket surface z: " << basket_surface_z << std::endl;
+    std::cout << "Pre-place EE z: " << target_ee_pre_place_z << std::endl;
+    std::cout << "Theoretical contact EE z: " << target_ee_contact_z << std::endl;
 
+    // Limiti dentro la cesta
     double min_x = basket_pos[0] - basket_size[0] / 2.0 + wall_margin;
     double max_x = basket_pos[0] + basket_size[0] / 2.0 - wall_margin;
 
@@ -333,14 +515,15 @@ int main(int argc, char **argv){
     std::cout << "Random y range: [" << min_y << ", " << max_y << "]" << std::endl;
 
     trajectory_msgs::msg::JointTrajectory traj_cabinet_to_random_drop;
+    trajectory_msgs::msg::JointTrajectory traj_down_to_contact;
     std::vector<double> random_drop_config;
     Eigen::Affine3d random_drop_pose;
 
-    bool reached_random_drop = false;
+    bool reached_valid_place = false;
 
     int max_attempts = 200;
 
-    for (int i = 0; i < max_attempts && !reached_random_drop; i++) {
+    for (int i = 0; i < max_attempts && !reached_valid_place; i++) {
 
         double random_x = min_x + static_cast<double>(std::rand()) / RAND_MAX * (max_x - min_x);
         double random_y = min_y + static_cast<double>(std::rand()) / RAND_MAX * (max_y - min_y);
@@ -349,13 +532,13 @@ int main(int argc, char **argv){
 
         random_drop_pose.translation().x() = random_x;
         random_drop_pose.translation().y() = random_y;
-        random_drop_pose.translation().z() = target_ee_z;
+        random_drop_pose.translation().z() = target_ee_pre_place_z;
 
         // Mantengo lo stesso orientamento usato sopra al cabinet.
         // In questo modo l'oggetto non viene capovolto.
-        //random_drop_pose.linear() = posa_robot_on_cabinet.linear();
+        random_drop_pose.linear() = posa_robot_on_cabinet.linear();
 
-        std::cout << "Attempt " << i + 1 << " random drop target x: " << random_x << " y: " << random_y << " z: " << target_ee_z << std::endl;
+        std::cout << "Attempt " << i + 1 << " random drop target x: " << random_x << " y: " << random_y << " z: " << target_ee_pre_place_z << std::endl;
 
         std::vector<std::vector<double>> ik_solutions_cabinet_to_random_drop;
         robot_planning.inverse_kinematics(random_drop_pose,ik_solutions_cabinet_to_random_drop,final_on_cabinet_config);
@@ -365,60 +548,122 @@ int main(int argc, char **argv){
             continue;
         }
 
-        for (int j = 0; j < ik_solutions_cabinet_to_random_drop.size(); j++) {
+        for (size_t j = 0; j < ik_solutions_cabinet_to_random_drop.size(); j++) {
 
-            trajectory_msgs::msg::JointTrajectory candidate_traj;
+            trajectory_msgs::msg::JointTrajectory candidate_traj_to_random_drop;
 
-            bool valid_interp = interpolation_trajectory(ik_solutions_cabinet_to_random_drop[j],final_on_cabinet_config,num_interpolations,candidate_traj,robot_planning);
+            bool valid_interp = interpolation_trajectory(ik_solutions_cabinet_to_random_drop[j],final_on_cabinet_config,num_interpolations,candidate_traj_to_random_drop,robot_planning);
 
             if (!valid_interp) {
-                std::cout << "IK found, but interpolation is not valid. Trying another solution/pose..." << std::endl;
+                std::cout << "IK found, but cabinet -> random_drop interpolation is not valid. Trying another solution/pose..." << std::endl;
                 continue;
             }
 
-            bool ok = robot_planning.execute_trajectory(candidate_traj);
-
-            if (!ok) {
-                RCLCPP_ERROR(node->get_logger(),
-                            "Execution to random drop pose failed. Trying another pose.");
-                continue;
-            }
-
-            traj_cabinet_to_random_drop = candidate_traj;
             random_drop_config = ik_solutions_cabinet_to_random_drop[j];
-            reached_random_drop = true;
 
-            std::cout << "Valid random drop pose reached." << std::endl;
+            std::cout << "Candidate cabinet -> random_drop trajectory is valid. Now checking vertical descent before execution..." << std::endl;
 
-            rclcpp::sleep_for(std::chrono::seconds(3));
+            //********************************************************************************
+            // VERIFICA DELLA DISCESA VERTICALE SENZA ANCORA ESEGUIRE 
+            //********************************************************************************
+
+            double search_extra_depth = 0.050;
+            double target_ee_search_z = target_ee_contact_z - search_extra_depth;
+
+            trajectory_msgs::msg::JointTrajectory candidate_traj_down_to_contact;
+            double eef_step = 0.003;
+            double penetration = 0.003;
+
+            std::cout << "Vertical descent search from z " << random_drop_pose.translation().z() << " to z " << target_ee_search_z << " using contact object: " << basket_contact_object<< std::endl;
+
+            bool vertical_ok = plan_vertical_cartesian_until_contact_from_state(random_drop_pose,random_drop_config,target_ee_search_z,basket_contact_object,object_name,eef_step,penetration,candidate_traj_down_to_contact,robot_planning);
+
+            if (!vertical_ok) {
+                std::cout << "Vertical descent not valid from this random_drop_config. Trying another pose..." << std::endl;
+                continue;
+            }
+
+            std::cout << "Both trajectories are valid. Executing cabinet -> random_drop..." << std::endl;
+
+            bool ok_pre_place = robot_planning.execute_trajectory(candidate_traj_to_random_drop);
+
+            if (!ok_pre_place) {
+                RCLCPP_ERROR(node->get_logger(), "Execution to random drop pose failed. Trying another pose.");
+                continue;
+            }
+
+            rclcpp::sleep_for(std::chrono::seconds(1));
+
+            std::cout << "Executing vertical descent to contact..." << std::endl;
+
+            bool exec_down_ok = robot_planning.execute_trajectory(candidate_traj_down_to_contact);
+
+            if (!exec_down_ok) {
+                RCLCPP_WARN(node->get_logger(), "Vertical descent execution failed. Trying another pose.");
+                continue;
+            }
+
+            traj_cabinet_to_random_drop = candidate_traj_to_random_drop;
+            traj_down_to_contact = candidate_traj_down_to_contact;
+            reached_valid_place = true;
+
+            std::cout << "Valid pre-place and vertical descent completed. Ready to release object." << std::endl;
+            rclcpp::sleep_for(std::chrono::seconds(2));
             break;
         }
     }
 
-    if (!reached_random_drop) {
-        RCLCPP_ERROR(node->get_logger(),
-                    "Could not find and execute any valid random drop pose.");
+    if (!reached_valid_place) {
+        RCLCPP_ERROR(node->get_logger(), "Could not find any random pose valid for both cabinet trajectory and vertical descent.");
         rclcpp::shutdown();
         return 1;
     }
-    
-
-    //********************************************************************************
-    // MOVIMENTO VERTICALE DENTRO LA CESTA
-    //********************************************************************************
-
-
 
     //********************************************************************************
     // RILASCIO DELL'OGGETTO
     //********************************************************************************
+    RCLCPP_INFO(node->get_logger(), "Opening gripper to release object...");
 
+    command_gripper(node, gripper_open_position, gripper_motion_duration);
+    rclcpp::sleep_for(std::chrono::milliseconds(500));
+
+    robot_planning.detach_object(object_name);
+    rclcpp::sleep_for(std::chrono::milliseconds(500));
+
+    RCLCPP_INFO(node->get_logger(), "Object detached and released.");
 
     //********************************************************************************
-    // MOVIMENTO DI RITORNO ALLA CONFIGURAZIONE INIZIALE
-    
+    // RISALITA VERTICALE E RITORNO SOPRA AL CABINET
     //********************************************************************************
+    if (!traj_down_to_contact.points.empty()) {
+        trajectory_msgs::msg::JointTrajectory traj_up_from_contact;
+        traj_up_from_contact.joint_names = traj_down_to_contact.joint_names;
 
+        double dt = 0.25;
+        int out_index = 0;
+
+        for (auto it = traj_down_to_contact.points.rbegin(); it != traj_down_to_contact.points.rend(); ++it) {
+            trajectory_msgs::msg::JointTrajectoryPoint p = *it;
+            p.time_from_start = rclcpp::Duration::from_seconds(dt * static_cast<double>(out_index));
+            traj_up_from_contact.points.push_back(p);
+            out_index++;
+        }
+
+        std::cout << "Executing vertical ascent after release..." << std::endl;
+        robot_planning.execute_trajectory(traj_up_from_contact);
+        rclcpp::sleep_for(std::chrono::seconds(2));
+    }
+
+    trajectory_msgs::msg::JointTrajectory traj_back_to_cabinet;
+    bool back_ok = interpolation_trajectory(final_on_cabinet_config,random_drop_config,num_interpolations,traj_back_to_cabinet,robot_planning);
+
+    if (back_ok) {
+        std::cout << "Returning above cabinet..." << std::endl;
+        robot_planning.execute_trajectory(traj_back_to_cabinet);
+        rclcpp::sleep_for(std::chrono::seconds(2));
+    } else {
+        RCLCPP_ERROR(node->get_logger(), "Could not return to cabinet after release.");
+    }
 
     rclcpp::shutdown();
     return 0;

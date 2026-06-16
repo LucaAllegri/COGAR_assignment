@@ -23,6 +23,7 @@ def generate_launch_description():
     params_basket = {
         "basket_pos": [0.387, 0.000, -0.262],
         "basket_size": [0.500, 0.540, 0.310, 0.010],
+        "basket_contact_object": "basket_bottom",
     }
 
     params_robot = {
@@ -43,7 +44,7 @@ def generate_launch_description():
     configs = {
         "start_config": [0,-1.57,0.0,-1.57,0.0,0.0],
         "config_on_table": [0.453786, -1.09956, -1.65806, -1.95477, 1.5708, 0.418879],
-        "config_on_cabinet" : [-0.715585, -2.37365, 1.74533, -0.942478, 4.72984, -0.680678],
+        "config_on_cabinet" : [3.76991, -0.907571, -1.5708, 4.10152, 1.5708, 0.645772],
     }
 
 
@@ -52,7 +53,7 @@ def generate_launch_description():
         "num_interpolations": 20,
         "hard_scene": False,
         "distance_obj_basket": 0.080,  #try 0.005 / 0.020 / 0.050 / 0.080
-        "wall_margin": 0.012,
+        "wall_margin": 0.16,
     }
 
     return LaunchDescription([
