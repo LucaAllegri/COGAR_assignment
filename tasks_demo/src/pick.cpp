@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 #include <chrono>
+#include <cstdlib>
+#include <ctime>
 
 void command_gripper(const rclcpp::Node::SharedPtr& node,
                      double position,
@@ -148,6 +150,10 @@ int main(int argc, char **argv){
     std::vector<double> on_object_position = node->declare_parameter<std::vector<double>>("on_object_position",std::vector<double>{-0.500, -0.100, 0.218});
     std::vector<double> on_object_rpy = node->declare_parameter<std::vector<double>>("on_object_rpy",std::vector<double>{3.14, 0.0, 0.0});
 
+    //******** CONFIG BASKET
+    std::vector<double> basket_pos = node->declare_parameter<std::vector<double>>("basket_pos",std::vector<double>{0.387, 0.000, -0.262});
+    std::vector<double> basket_size = node->declare_parameter<std::vector<double>>("basket_size",std::vector<double>{0.500, 0.540, 0.310, 0.010});
+
     //******** CONFIG ROBOT INIZIALE 
 	std::vector<double> robot_config_start = node->declare_parameter<std::vector<double>>("start_config", std::vector<double>{0,-1.57,0.0,-1.57,0.0,0.0});
     Eigen::Affine3d posa_robot_start; 
@@ -165,7 +171,9 @@ int main(int argc, char **argv){
 
 
     //******** NUM INTERPOLAZIONI
-    int num_interpolations = node->declare_parameter<int>("num_interpolazioni",10);
+    int num_interpolations = node->declare_parameter<int>("num_interpolations",20);
+    double offset_obj_basket = node->declare_parameter<double>("distance_obj_basket",0.080);
+    double wall_margin = node->declare_parameter<double>("wall_margin",0.08);
 
     //******** GRIPPER
     double gripper_open_position = node->declare_parameter<double>("gripper_open_position", 0.030);
@@ -256,16 +264,27 @@ int main(int argc, char **argv){
     }
 
     //********************************************************************************
-    // MOVIMENTO DALLA CONFIGURAZIONE SOPRA ALL'OGGETTO (GRASPATO) A QUELLA SOPRA AL TAVOLO 
+    // MOVIMENTO DALLA CONFIGURAZIONE SOPRA ALL'OGGETTO (GRASPATO) A QUELLA SOPRA AL CABINET 
     std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG SOPRA AL TAVOLO -> CONFIG SOPRA AL CABINET: " << std::endl;
     std::vector<std::vector<double>> ik_solutions_table_cabinet;
 	robot_planning.inverse_kinematics(posa_robot_on_cabinet, ik_solutions_table_cabinet,robot_config_on_table); 
 
+    std::vector<double> final_on_cabinet_config;
     trajectory_msgs::msg::JointTrajectory traj_table_to_on_cabinet;
+    bool reached_cabinet = false;
 
     for(int i=0; i<ik_solutions_table_cabinet.size();i++){
         if (interpolation_trajectory(ik_solutions_table_cabinet[i], robot_config_on_table, num_interpolations, traj_table_to_on_cabinet, robot_planning)){
-            robot_planning.execute_trajectory(traj_table_to_on_cabinet);
+            
+            bool ok = robot_planning.execute_trajectory(traj_table_to_on_cabinet);
+
+            if (!ok){
+                RCLCPP_ERROR(node->get_logger(), "Execution to cabinet failed. Trying another IK solution.");
+                continue;
+            }
+
+            final_on_cabinet_config = ik_solutions_table_cabinet[i];
+            reached_cabinet = true;
             rclcpp::sleep_for(std::chrono::seconds(5));
             break;
         }
@@ -274,10 +293,132 @@ int main(int argc, char **argv){
 
     //********************************************************************************
     // MOVIMENTO DALLA CONFIGURAZIONE SOPRA ALL'OGGETTO (GRASPATO) A QUELLA SOPRA AL TAVOLO 
+    std::cout << "SOLUZIONI INVERSE KINEMATICS CONFIG SOPRA AL CABINET -> CONFIG DENTRO ALLA CESTA: " << std::endl;
+    // Random drop position around the nominal cabinet pose
+    std::srand(std::time(nullptr));
+
+    double ee_z_at_pick = on_object_position[2];
+
+    // Offset verticale tra EE e centro oggetto durante il grasp.
+    double ee_object_offset_z = ee_z_at_pick - object_position[2];
+
+    std::cout << "EE-object vertical offset: " << ee_object_offset_z << std::endl;
+
+    // Calcolo quota dentro alla cesta
+
+    // Superficie superiore del fondo della cesta
+    double basket_bottom_surface_z = basket_pos[2] + basket_size[3] / 2.0;
+
+    // Quota desiderata del centro dell'oggetto durante il place
+    double object_center_target_z = basket_bottom_surface_z + object_size[2] / 2.0 + offset_obj_basket;
+
+    // Quota desiderata dell'EE durante il place
+    double target_ee_z = object_center_target_z + ee_object_offset_z;
+
+    std::cout << "Basket bottom surface z: " << basket_bottom_surface_z << std::endl;
+    std::cout << "Object center target z: " << object_center_target_z << std::endl;
+    std::cout << "Target EE z inside basket: " << target_ee_z << std::endl;
+
+    // --------------------
+    // Limiti random dentro la cesta
+    // --------------------
+
+    double min_x = basket_pos[0] - basket_size[0] / 2.0 + wall_margin;
+    double max_x = basket_pos[0] + basket_size[0] / 2.0 - wall_margin;
+
+    double min_y = basket_pos[1] - basket_size[1] / 2.0 + wall_margin;
+    double max_y = basket_pos[1] + basket_size[1] / 2.0 - wall_margin;
+
+    std::cout << "Random x range: [" << min_x << ", " << max_x << "]" << std::endl;
+    std::cout << "Random y range: [" << min_y << ", " << max_y << "]" << std::endl;
+
+    trajectory_msgs::msg::JointTrajectory traj_cabinet_to_random_drop;
+    std::vector<double> random_drop_config;
+    Eigen::Affine3d random_drop_pose;
+
+    bool reached_random_drop = false;
+
+    int max_attempts = 200;
+
+    for (int i = 0; i < max_attempts && !reached_random_drop; i++) {
+
+        double random_x = min_x + static_cast<double>(std::rand()) / RAND_MAX * (max_x - min_x);
+        double random_y = min_y + static_cast<double>(std::rand()) / RAND_MAX * (max_y - min_y);
+
+        random_drop_pose = posa_robot_on_cabinet;
+
+        random_drop_pose.translation().x() = random_x;
+        random_drop_pose.translation().y() = random_y;
+        random_drop_pose.translation().z() = target_ee_z;
+
+        // Mantengo lo stesso orientamento usato sopra al cabinet.
+        // In questo modo l'oggetto non viene capovolto.
+        //random_drop_pose.linear() = posa_robot_on_cabinet.linear();
+
+        std::cout << "Attempt " << i + 1 << " random drop target x: " << random_x << " y: " << random_y << " z: " << target_ee_z << std::endl;
+
+        std::vector<std::vector<double>> ik_solutions_cabinet_to_random_drop;
+        robot_planning.inverse_kinematics(random_drop_pose,ik_solutions_cabinet_to_random_drop,final_on_cabinet_config);
+
+        if (ik_solutions_cabinet_to_random_drop.empty()) {
+            std::cout << "No IK solution for this random pose. Trying another one..." << std::endl;
+            continue;
+        }
+
+        for (int j = 0; j < ik_solutions_cabinet_to_random_drop.size(); j++) {
+
+            trajectory_msgs::msg::JointTrajectory candidate_traj;
+
+            bool valid_interp = interpolation_trajectory(ik_solutions_cabinet_to_random_drop[j],final_on_cabinet_config,num_interpolations,candidate_traj,robot_planning);
+
+            if (!valid_interp) {
+                std::cout << "IK found, but interpolation is not valid. Trying another solution/pose..." << std::endl;
+                continue;
+            }
+
+            bool ok = robot_planning.execute_trajectory(candidate_traj);
+
+            if (!ok) {
+                RCLCPP_ERROR(node->get_logger(),
+                            "Execution to random drop pose failed. Trying another pose.");
+                continue;
+            }
+
+            traj_cabinet_to_random_drop = candidate_traj;
+            random_drop_config = ik_solutions_cabinet_to_random_drop[j];
+            reached_random_drop = true;
+
+            std::cout << "Valid random drop pose reached." << std::endl;
+
+            rclcpp::sleep_for(std::chrono::seconds(3));
+            break;
+        }
+    }
+
+    if (!reached_random_drop) {
+        RCLCPP_ERROR(node->get_logger(),
+                    "Could not find and execute any valid random drop pose.");
+        rclcpp::shutdown();
+        return 1;
+    }
+    
+
+    //********************************************************************************
+    // MOVIMENTO VERTICALE DENTRO LA CESTA
+    //********************************************************************************
+
 
 
     //********************************************************************************
-    // MOVIMENTO DALLA CONFIGURAZIONE SOPRA ALL'OGGETTO (GRASPATO) A QUELLA SOPRA AL TAVOLO 
+    // RILASCIO DELL'OGGETTO
+    //********************************************************************************
+
+
+    //********************************************************************************
+    // MOVIMENTO DI RITORNO ALLA CONFIGURAZIONE INIZIALE
+    
+    //********************************************************************************
+
 
     rclcpp::shutdown();
     return 0;

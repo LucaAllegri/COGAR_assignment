@@ -20,6 +20,11 @@ def generate_launch_description():
         "on_object_rpy": [3.14,0.0,0.0],
     }
 
+    params_basket = {
+        "basket_pos": [0.387, 0.000, -0.262],
+        "basket_size": [0.500, 0.540, 0.310, 0.010],
+    }
+
     params_robot = {
         "planning_group": "ur_manipulator",
 
@@ -46,6 +51,8 @@ def generate_launch_description():
         "use_bin": True,
         "num_interpolations": 20,
         "hard_scene": False,
+        "distance_obj_basket": 0.080,  #try 0.005 / 0.020 / 0.050 / 0.080
+        "wall_margin": 0.012,
     }
 
     return LaunchDescription([
@@ -63,6 +70,7 @@ def generate_launch_description():
                 params_usefull,
                 configs,
                 params_gripper,
+                params_basket,
             ],
         )
     ])
