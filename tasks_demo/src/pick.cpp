@@ -249,15 +249,26 @@ bool interpolation_trajectory(std::vector<double> ik_solution,
 			Eigen::Vector3d y_axis = rotation_matrix.col(1); // Asse Y della matrice di rotazione
 
 			// Verifico la validità del punto interpolato
-			if (!robot_planning.check_state_validity(stato_interpolato,contact_pairs)) {
-				// Punto interpolato non valido
-				std::cout << "Interpolazione non valida al punto " << l << std::endl;
-				correct_state_interpolate.clear();
-				break;                
-			}else{
-				count_valid_interpolation++;
-				correct_state_interpolate.push_back(stato_interpolato);
-			}
+			if (robot_planning.check_state_validity(stato_interpolato, contact_pairs)) {
+                count_valid_interpolation++;
+                correct_state_interpolate.push_back(stato_interpolato);
+            } else {
+                std::cout << "Invalid interpolated state at step "
+                        << l << "/" << num_interpolation << std::endl;
+
+                std::cout << "State: ";
+                for (double q : stato_interpolato) {
+                    std::cout << q << " ";
+                }
+                std::cout << std::endl;
+
+                std::cout << "Contact pairs:" << std::endl;
+                for (const auto &pair : contact_pairs) {
+                    std::cout << "  " << pair.first << " -- " << pair.second << std::endl;
+                }
+
+                return false;
+            }
 		}
 
         if (count_valid_interpolation == num_interpolation){
@@ -313,9 +324,9 @@ int main(int argc, char **argv){
     //******** CONFIG OGGETTO
     std::string object_name = node->declare_parameter<std::string>("object_name","object_box");
     std::vector<double> object_size = node->declare_parameter<std::vector<double>>("object_size",std::vector<double>{0.040, 0.040, 0.100});
-    std::vector<double> object_position = node->declare_parameter<std::vector<double>>("object_position",std::vector<double>{-0.500, -0.100, -0.032});
+    std::vector<double> object_position = node->declare_parameter<std::vector<double>>("object_position",std::vector<double>{-0.500, 0.150, -0.032});
     
-    std::vector<double> on_object_position = node->declare_parameter<std::vector<double>>("on_object_position",std::vector<double>{-0.500, -0.100, 0.218});
+    std::vector<double> on_object_position = node->declare_parameter<std::vector<double>>("on_object_position",std::vector<double>{-0.500, 0.150, 0.218});
     std::vector<double> on_object_rpy = node->declare_parameter<std::vector<double>>("on_object_rpy",std::vector<double>{3.14, 0.0, 0.0});
 
     //******** CONFIG BASKET
@@ -338,6 +349,7 @@ int main(int argc, char **argv){
     std::vector<double> cabinet_place_pos = node->declare_parameter<std::vector<double>>("cabinet_place_pos",std::vector<double>{0.247, 0.000,-0.547});
     std::vector<double> cabinet_place_size = node->declare_parameter<std::vector<double>>("cabinet_place_size",std::vector<double>{0.780, 0.560, 0.285});
     bool use_bin = node->declare_parameter<bool>("use_bin", true);
+    bool hard_scene = node->declare_parameter<bool>("hard_scene", true);
 
     //******** CONFIG ROBOT INIZIALE 
 	std::vector<double> robot_config_start = node->declare_parameter<std::vector<double>>("start_config", std::vector<double>{0,-1.57,0.0,-1.57,0.0,0.0});
@@ -356,24 +368,16 @@ int main(int argc, char **argv){
 
 
     // start
-    std::vector<std::vector<double>> ik_solutions_start_table;
-
-    std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG INIZIALE -> CONFIG SOPRA TAVOLO: " << std::endl;
-
-	robot_planning.inverse_kinematics(posa_robot_on_table, ik_solutions_start_table,robot_config_start); 
-
     //********************************************************************************
     // MOVIMENTO DALLA CONFIGURAZIONE INIZIALE A QUELLA SOPRA AL TAVOLO
     //********************************************************************************
+    std::cout << "SOLUZIONI INTERPOLAZIONE CONFIG INIZIALE -> CONFIG SOPRA TAVOLO: " << std::endl;
 
     trajectory_msgs::msg::JointTrajectory traj_start_to_on_table;
 
-    for(int i=0; i<ik_solutions_start_table.size();i++){
-        if (interpolation_trajectory(ik_solutions_start_table[i], robot_config_start, num_interpolations, traj_start_to_on_table, robot_planning)){
-            robot_planning.execute_trajectory(traj_start_to_on_table);
-            rclcpp::sleep_for(std::chrono::seconds(5));
-            break;
-        }
+    if (interpolation_trajectory(robot_config_on_table, robot_config_start, num_interpolations, traj_start_to_on_table, robot_planning)){
+        robot_planning.execute_trajectory(traj_start_to_on_table);
+        rclcpp::sleep_for(std::chrono::seconds(5));
     }
 
     //********************************************************************************
@@ -401,14 +405,28 @@ int main(int argc, char **argv){
 
     trajectory_msgs::msg::JointTrajectory traj_table_to_on_object;
     std::vector<double> on_object_config;
+    bool reached_object = false;
 
     for(int i=0; i<ik_solutions_table_object.size();i++){
         if (interpolation_trajectory(ik_solutions_table_object[i], robot_config_on_table, num_interpolations, traj_table_to_on_object, robot_planning)){
             on_object_config = ik_solutions_table_object[i];
-            robot_planning.execute_trajectory(traj_table_to_on_object);
+            bool ok = robot_planning.execute_trajectory(traj_table_to_on_object);
+
+            if (!ok) {
+                RCLCPP_ERROR(node->get_logger(), "Execution to object failed. Trying another IK solution.");
+                continue;
+            }
+
+            reached_object = true;
             rclcpp::sleep_for(std::chrono::seconds(5));
             break;
         }
+    }
+
+    if (!reached_object) {
+        RCLCPP_ERROR(node->get_logger(), "Could not reach object pick pose. Aborting before grasp.");
+        rclcpp::shutdown();
+        return 1;
     }
 
     //********************************************************************************

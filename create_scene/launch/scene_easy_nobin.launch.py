@@ -53,7 +53,7 @@ boxes.append(CollisionObject(shape_type=BOX,name="cabinet_boundary_3",size=[0.00
 #------------
 
 # Oggetto da graspare
-boxes.append(CollisionObject(shape_type=BOX,name="object_box",size=[0.040, 0.04, 0.1],position=[-0.500, -0.100, -0.032],orientation=[0.0, 0.0, 0.0],color=[0.0, 0.45, 1.0, 1.0],ref_link="base_link",))
+boxes.append(CollisionObject(shape_type=BOX,name="object_box",size=[0.040, 0.04, 0.1],position=[-0.500, 0.150, -0.032],orientation=[0.0, 0.0, 0.0],color=[0.0, 0.45, 1.0, 1.0],ref_link="base_link",))
 #------------
 
 # Piano del tavolo
