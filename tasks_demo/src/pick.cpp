@@ -322,6 +322,23 @@ int main(int argc, char **argv){
     std::vector<double> basket_pos = node->declare_parameter<std::vector<double>>("basket_pos",std::vector<double>{0.387, 0.000, -0.262});
     std::vector<double> basket_size = node->declare_parameter<std::vector<double>>("basket_size",std::vector<double>{0.500, 0.540, 0.310, 0.010});
 
+    //******** GRIPPER
+    double gripper_open_position = node->declare_parameter<double>("gripper_open_position", 0.030);
+    double gripper_closed_position = node->declare_parameter<double>("gripper_closed_position", 0.026);
+    double gripper_motion_duration =node->declare_parameter<double>("gripper_motion_duration", 1.0);
+    double target_force = node->declare_parameter<double>("target_force", 40.0);
+    double force_threshold = node->declare_parameter<double>("force_threshold", 30.0);
+    std::string gripper_link = node->declare_parameter<std::string>("gripper_link", "gripper_base_link");
+    
+    //******** PARAMS USEFUL
+    int num_interpolations = node->declare_parameter<int>("num_interpolations",20);
+    double offset_obj_basket = node->declare_parameter<double>("distance_obj_basket",0.080);
+    double wall_bin_margin = node->declare_parameter<double>("wall_margin",0.08);
+    std::string place_contact_object = node->declare_parameter<std::string>("place_contact_object","basket_bottom");
+    std::vector<double> cabinet_place_pos = node->declare_parameter<std::vector<double>>("cabinet_place_pos",std::vector<double>{0.247, 0.000,-0.547});
+    std::vector<double> cabinet_place_size = node->declare_parameter<std::vector<double>>("cabinet_place_size",std::vector<double>{0.780, 0.560, 0.285});
+    bool use_bin = node->declare_parameter<bool>("use_bin", true);
+
     //******** CONFIG ROBOT INIZIALE 
 	std::vector<double> robot_config_start = node->declare_parameter<std::vector<double>>("start_config", std::vector<double>{0,-1.57,0.0,-1.57,0.0,0.0});
     Eigen::Affine3d posa_robot_start; 
@@ -336,19 +353,6 @@ int main(int argc, char **argv){
 	std::vector<double> robot_config_on_cabinet = node->declare_parameter<std::vector<double>>("config_on_cabinet", std::vector<double>{-0.715585, -2.37365, 1.74533, -0.942478, 4.72984, -0.680678});
     Eigen::Affine3d posa_robot_on_cabinet; 
     robot_planning.forward_kinematics(robot_config_on_cabinet, posa_robot_on_cabinet, "wrist_3_link");
-
-
-    //******** NUM INTERPOLAZIONI
-    int num_interpolations = node->declare_parameter<int>("num_interpolations",20);
-    double offset_obj_basket = node->declare_parameter<double>("distance_obj_basket",0.080);
-    double wall_margin = node->declare_parameter<double>("wall_margin",0.08);
-    std::string basket_contact_object = node->declare_parameter<std::string>("basket_contact_object", "basket_bottom");
-
-    //******** GRIPPER
-    double gripper_open_position = node->declare_parameter<double>("gripper_open_position", 0.030);
-    double gripper_closed_position = node->declare_parameter<double>("gripper_closed_position", 0.026);
-    double gripper_motion_duration =node->declare_parameter<double>("gripper_motion_duration", 1.0);
-    std::string gripper_link = node->declare_parameter<std::string>("gripper_link", "gripper_base_link");
 
 
     // start
@@ -486,30 +490,45 @@ int main(int argc, char **argv){
     // Offset verticale tra EE e centro oggetto durante il grasp.
     double ee_object_offset_z = ee_z_at_pick - object_position[2];
 
-    // Superficie superiore del fondo della cesta
-    double basket_surface_z = basket_pos[2] + basket_size[3] / 2.0;
+    std::vector<double> place_area_pos;
+    std::vector<double> place_area_size;
+    double place_surface_z = 0.0;
+
+    if (use_bin) {
+        place_area_pos = basket_pos;
+        place_area_size = basket_size;
+        place_surface_z = basket_pos[2] + basket_size[3] / 2.0;
+        RCLCPP_INFO(node->get_logger(), "Place mode: BIN. Contact object: %s", place_contact_object.c_str());
+    
+    } else {
+        place_area_pos = cabinet_place_pos;
+        place_area_size = std::vector<double>{cabinet_place_size[0], cabinet_place_size[1], cabinet_place_size[2], 0.0};
+        place_surface_z = cabinet_place_pos[2] + cabinet_place_size[2] - 0.090; 
+
+        RCLCPP_INFO(node->get_logger(), "Place mode: NO BIN. Contact object: %s", place_contact_object.c_str());
+    }
 
     // Quota desiderata del centro dell'oggetto durante il place
-    double object_center_pre_place_z = basket_surface_z + object_size[2] / 2.0 + offset_obj_basket;
+    double object_center_pre_place_z = place_surface_z + object_size[2] / 2.0 + offset_obj_basket;
 
     // Quota desiderata dell'EE durante il place
     double target_ee_pre_place_z = object_center_pre_place_z + ee_object_offset_z;
 
     // Quota teorica di contatto: fondo oggetto alla quota della superficie del basket.
-    double object_contact_target_z = basket_surface_z + object_size[2] / 2.0;
+    double object_contact_target_z = place_surface_z + object_size[2] / 2.0;
     double target_ee_contact_z = object_contact_target_z + ee_object_offset_z;
 
     std::cout << "EE-object vertical offset: " << ee_object_offset_z << std::endl;
-    std::cout << "Basket surface z: " << basket_surface_z << std::endl;
+    std::cout << "Place surface z: " << place_surface_z << std::endl;
     std::cout << "Pre-place EE z: " << target_ee_pre_place_z << std::endl;
     std::cout << "Theoretical contact EE z: " << target_ee_contact_z << std::endl;
 
     // Limiti dentro la cesta
-    double min_x = basket_pos[0] - basket_size[0] / 2.0 + wall_margin;
-    double max_x = basket_pos[0] + basket_size[0] / 2.0 - wall_margin;
+    double min_x = place_area_pos[0] - place_area_size[0] / 2.0 + wall_bin_margin;
+    double max_x = place_area_pos[0] + place_area_size[0] / 2.0 - wall_bin_margin;
 
-    double min_y = basket_pos[1] - basket_size[1] / 2.0 + wall_margin;
-    double max_y = basket_pos[1] + basket_size[1] / 2.0 - wall_margin;
+    double min_y = place_area_pos[1] - place_area_size[1] / 2.0 + wall_bin_margin;
+    double max_y = place_area_pos[1] + place_area_size[1] / 2.0 - wall_bin_margin;
 
     std::cout << "Random x range: [" << min_x << ", " << max_x << "]" << std::endl;
     std::cout << "Random y range: [" << min_y << ", " << max_y << "]" << std::endl;
@@ -521,7 +540,7 @@ int main(int argc, char **argv){
 
     bool reached_valid_place = false;
 
-    int max_attempts = 200;
+    int max_attempts = 300;
 
     for (int i = 0; i < max_attempts && !reached_valid_place; i++) {
 
@@ -574,9 +593,9 @@ int main(int argc, char **argv){
             double eef_step = 0.003;
             double penetration = 0.003;
 
-            std::cout << "Vertical descent search from z " << random_drop_pose.translation().z() << " to z " << target_ee_search_z << " using contact object: " << basket_contact_object<< std::endl;
+            std::cout << "Vertical descent search from z " << random_drop_pose.translation().z() << " to z " << target_ee_search_z << " using contact object: " << place_contact_object<< std::endl;
 
-            bool vertical_ok = plan_vertical_cartesian_until_contact_from_state(random_drop_pose,random_drop_config,target_ee_search_z,basket_contact_object,object_name,eef_step,penetration,candidate_traj_down_to_contact,robot_planning);
+            bool vertical_ok = plan_vertical_cartesian_until_contact_from_state(random_drop_pose,random_drop_config,target_ee_search_z,place_contact_object,object_name,eef_step,penetration,candidate_traj_down_to_contact,robot_planning);
 
             if (!vertical_ok) {
                 std::cout << "Vertical descent not valid from this random_drop_config. Trying another pose..." << std::endl;

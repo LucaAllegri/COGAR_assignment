@@ -11,6 +11,9 @@ def generate_launch_description():
         .to_moveit_configs()
     )
 
+    USE_BIN = False
+    HARD_SCENE = False
+
     params_object = {
         "object_name": "object_box",
         "object_position": [-0.500, -0.100, -0.032],
@@ -23,38 +26,40 @@ def generate_launch_description():
     params_basket = {
         "basket_pos": [0.387, 0.000, -0.262],
         "basket_size": [0.500, 0.540, 0.310, 0.010],
-        "basket_contact_object": "basket_bottom",
     }
 
     params_robot = {
         "planning_group": "ur_manipulator",
-
-        # Simulated force-grasp threshold
-        "target_force": 40.0,
-        "force_threshold": 30.0,
     }
 
     params_gripper = {
         "gripper_open_position": 0.030,
         "gripper_closed_position": 0.026,
         "gripper_motion_duration": 1.0,
+        "target_force": 40.0,
+        "force_threshold": 30.0,
         "gripper_link": "gripper_base_link", # link used to attach the object during simulated grasp
     }
 
     configs = {
         "start_config": [0,-1.57,0.0,-1.57,0.0,0.0],
-        "config_on_table": [0.453786, -1.09956, -1.65806, -1.95477, 1.5708, 0.418879],
-        "config_on_cabinet" : [3.76991, -0.907571, -1.5708, 4.10152, 1.5708, 0.645772],
+        "config_on_table": [0.453786, -1.09956, -1.65806, -1.95477, 1.5708, 0.418879] if not HARD_SCENE else [0.453786, -1.09956, -1.65806, -1.95477, 1.5708, 0.418879],
+        "config_on_cabinet" : [-0.645772, -1.76278, 1.39626, -4.34587, 1.55334, 2.42601],
     }
 
 
     params_usefull = {
-        "use_bin": True,
+        "use_bin": USE_BIN,
         "num_interpolations": 20,
-        "hard_scene": False,
         "distance_obj_basket": 0.080,  #try 0.005 / 0.020 / 0.050 / 0.080
         "wall_margin": 0.16,
+
+        "place_contact_object": "basket_bottom" if USE_BIN else "cabinet_lower_body",
+        "cabinet_place_pos": [0.247, 0.000, -0.547],
+        "cabinet_place_size": [0.780, 0.560, 0.285],
+        
     }
+
 
     return LaunchDescription([
         Node(
