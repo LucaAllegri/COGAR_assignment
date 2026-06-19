@@ -328,6 +328,7 @@ int main(int argc, char **argv){
     
     std::vector<double> on_object_position = node->declare_parameter<std::vector<double>>("on_object_position",std::vector<double>{-0.500, 0.150, 0.218});
     std::vector<double> on_object_rpy = node->declare_parameter<std::vector<double>>("on_object_rpy",std::vector<double>{3.14, 0.0, 0.0});
+    std::vector<double> grasp_position = node->declare_parameter<std::vector<double>>("grasp_position",std::vector<double>{-0.500, 0.150, 0.218});
 
     //******** CONFIG BASKET
     std::vector<double> basket_pos = node->declare_parameter<std::vector<double>>("basket_pos",std::vector<double>{0.387, 0.000, -0.262});
@@ -399,7 +400,7 @@ int main(int argc, char **argv){
 
     std::vector<std::vector<double>> ik_solutions_table_object;
 
-    std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG SOPRA TAVOLO -> CONFIG SOPRA OGGETTO: " << std::endl;
+    std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG SOPRA TAVOLO ->  PRE-GRASP LATERALE: " << std::endl;
 
 	robot_planning.inverse_kinematics(robot_pick_pose, ik_solutions_table_object,robot_config_on_table); 
 
@@ -427,6 +428,57 @@ int main(int argc, char **argv){
         RCLCPP_ERROR(node->get_logger(), "Could not reach object pick pose. Aborting before grasp.");
         rclcpp::shutdown();
         return 1;
+    }
+
+    if (hard_scene){
+        RCLCPP_INFO(node->get_logger(), "Hard scene: moving linearly from pre-grasp to grasp along y.");
+
+        Eigen::Affine3d grasp_pose;
+        tf2::Quaternion q_grasp_pose;
+        Eigen::Quaterniond qEigen_grasp_pose;
+
+        q_grasp_pose.setRPY(on_object_rpy[0], on_object_rpy[1], on_object_rpy[2]);
+
+        qEigen_grasp_pose.x() = q_grasp_pose.x();
+        qEigen_grasp_pose.y() = q_grasp_pose.y();
+        qEigen_grasp_pose.z() = q_grasp_pose.z();
+        qEigen_grasp_pose.w() = q_grasp_pose.w();
+
+        grasp_pose.translation().x() = grasp_position[0];
+        grasp_pose.translation().y() = grasp_position[1];
+        grasp_pose.translation().z() = grasp_position[2];
+        grasp_pose.linear() = qEigen_grasp_pose.toRotationMatrix();
+
+        std::vector<std::vector<double>> ik_solutions_grasp;
+
+        robot_planning.inverse_kinematics(grasp_pose,ik_solutions_grasp,on_object_config);
+
+        trajectory_msgs::msg::JointTrajectory traj_pregrasp_to_grasp;
+        bool reached_grasp = false;
+
+        for (size_t i = 0; i < ik_solutions_grasp.size(); i++){
+            RCLCPP_INFO(node->get_logger(), "Trying grasp IK solution %zu...", i);
+
+            if (interpolation_trajectory(ik_solutions_grasp[i],on_object_config,10,traj_pregrasp_to_grasp,robot_planning)){
+                bool ok = robot_planning.execute_trajectory(traj_pregrasp_to_grasp);
+
+                if (!ok){
+                    RCLCPP_WARN(node->get_logger(), "Execution pre-grasp -> grasp failed.");
+                    continue;
+                }
+
+                on_object_config = ik_solutions_grasp[i];
+                reached_grasp = true;
+                rclcpp::sleep_for(std::chrono::seconds(2));
+                break;
+            }
+        }
+
+        if (!reached_grasp){
+            RCLCPP_ERROR(node->get_logger(), "Could not reach final lateral grasp pose.");
+            rclcpp::shutdown();
+            return 1;
+        }
     }
 
     //********************************************************************************
@@ -464,35 +516,52 @@ int main(int argc, char **argv){
     // MOVIMENTO DALLA CONFIGURAZIONE SOPRA AL TAVOLO A QUELLA SOPRA AL CABINET
     //********************************************************************************
 
-    std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG SOPRA AL TAVOLO -> CONFIG SOPRA AL CABINET: " << std::endl;
-    std::vector<std::vector<double>> ik_solutions_table_cabinet;
-	robot_planning.inverse_kinematics(posa_robot_on_cabinet, ik_solutions_table_cabinet,robot_config_on_table); 
+    std::cout << "MOVIMENTO CONFIG SOPRA AL TAVOLO -> CONFIG SOPRA AL CABINET: " << std::endl;
 
     std::vector<double> final_on_cabinet_config;
     trajectory_msgs::msg::JointTrajectory traj_table_to_on_cabinet;
+
     bool reached_cabinet = false;
 
-    for(int i=0; i<ik_solutions_table_cabinet.size();i++){
-        if (interpolation_trajectory(ik_solutions_table_cabinet[i], robot_config_on_table, num_interpolations, traj_table_to_on_cabinet, robot_planning)){
-            
-            bool ok = robot_planning.execute_trajectory(traj_table_to_on_cabinet);
+    if (interpolation_trajectory(robot_config_on_cabinet,robot_config_on_table,num_interpolations,traj_table_to_on_cabinet,robot_planning)){
+        bool ok = robot_planning.execute_trajectory(traj_table_to_on_cabinet);
 
-            if (!ok){
-                RCLCPP_ERROR(node->get_logger(), "Execution to cabinet failed. Trying another IK solution.");
-                continue;
-            }
-
-            final_on_cabinet_config = ik_solutions_table_cabinet[i];
+        if (ok){
+            final_on_cabinet_config = robot_config_on_cabinet;
             reached_cabinet = true;
             rclcpp::sleep_for(std::chrono::seconds(5));
-            break;
         }
     }
 
-    if (!reached_cabinet) {
-        RCLCPP_ERROR(node->get_logger(), "Could not reach cabinet pose.");
-        rclcpp::shutdown();
-        return 1;
+    if (!reached_cabinet){
+        std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG SOPRA AL TAVOLO -> CONFIG SOPRA AL CABINET: " << std::endl;
+        std::vector<std::vector<double>> ik_solutions_table_cabinet;
+        robot_planning.inverse_kinematics(posa_robot_on_cabinet, ik_solutions_table_cabinet,robot_config_on_table); 
+
+        bool reached_cabinet_second_way = false;
+
+        for(int i=0; i<ik_solutions_table_cabinet.size();i++){
+            if (interpolation_trajectory(ik_solutions_table_cabinet[i], robot_config_on_table, num_interpolations, traj_table_to_on_cabinet, robot_planning)){
+                
+                bool ok = robot_planning.execute_trajectory(traj_table_to_on_cabinet);
+
+                if (!ok){
+                    RCLCPP_ERROR(node->get_logger(), "Execution to cabinet failed. Trying another IK solution.");
+                    continue;
+                }
+
+                final_on_cabinet_config = ik_solutions_table_cabinet[i];
+                reached_cabinet_second_way = true;
+                rclcpp::sleep_for(std::chrono::seconds(5));
+                break;
+            }
+        }
+
+        if (!reached_cabinet_second_way) {
+            RCLCPP_ERROR(node->get_logger(), "Could not reach cabinet pose.");
+            rclcpp::shutdown();
+            return 1;
+        }
     }
 
     //********************************************************************************
@@ -503,10 +572,28 @@ int main(int argc, char **argv){
     // Random drop position around the nominal cabinet pose
     std::srand(std::time(nullptr));
 
-    double ee_z_at_pick = on_object_position[2];
+    double ee_object_offset_x;
+    double ee_object_offset_y;
+    double ee_object_offset_z;
 
-    // Offset verticale tra EE e centro oggetto durante il grasp.
-    double ee_object_offset_z = ee_z_at_pick - object_position[2];
+    if (hard_scene){
+        // HARD: la presa vera è grasp_position, non on_object_position.
+        ee_object_offset_x = grasp_position[0] - object_position[0];
+        ee_object_offset_y = grasp_position[1] - object_position[1];
+        ee_object_offset_z = grasp_position[2] - object_position[2];
+
+        std::cout << "HARD EE-object offset x: " << ee_object_offset_x << std::endl;
+        std::cout << "HARD EE-object offset y: " << ee_object_offset_y << std::endl;
+        std::cout << "HARD EE-object offset z: " << ee_object_offset_z << std::endl;
+    }else{
+        // EASY: come prima, interessa solo la quota verticale.
+        // x/y restano 0 per non modificare il comportamento precedente.
+        ee_object_offset_x = 0.0;
+        ee_object_offset_y = 0.0;
+        ee_object_offset_z = on_object_position[2] - object_position[2];
+
+        std::cout << "EASY EE-object offset z: " << ee_object_offset_z << std::endl;
+    }
 
     std::vector<double> place_area_pos;
     std::vector<double> place_area_size;
@@ -526,27 +613,78 @@ int main(int argc, char **argv){
         RCLCPP_INFO(node->get_logger(), "Place mode: NO BIN. Contact object: %s", place_contact_object.c_str());
     }
 
-    // Quota desiderata del centro dell'oggetto durante il place
-    double object_center_pre_place_z = place_surface_z + object_size[2] / 2.0 + offset_obj_basket;
+    double object_place_half_height;
+
+    if (hard_scene){
+        object_place_half_height = object_size[0] / 2.0; // Oggetto coricato
+    }else{
+        object_place_half_height = object_size[2] / 2.0; // Oggetto in piedi
+    }
+
+    double object_center_pre_place_z = place_surface_z + object_place_half_height+ offset_obj_basket;
 
     // Quota desiderata dell'EE durante il place
     double target_ee_pre_place_z = object_center_pre_place_z + ee_object_offset_z;
 
     // Quota teorica di contatto: fondo oggetto alla quota della superficie del basket.
-    double object_contact_target_z = place_surface_z + object_size[2] / 2.0;
+    double object_contact_target_z = place_surface_z + object_place_half_height;
     double target_ee_contact_z = object_contact_target_z + ee_object_offset_z;
 
-    std::cout << "EE-object vertical offset: " << ee_object_offset_z << std::endl;
+    std::cout << "Object place half height: " << object_place_half_height << std::endl;
     std::cout << "Place surface z: " << place_surface_z << std::endl;
+    std::cout << "Object center pre-place z: " << object_center_pre_place_z << std::endl;
     std::cout << "Pre-place EE z: " << target_ee_pre_place_z << std::endl;
+    std::cout << "Object contact target z: " << object_contact_target_z << std::endl;
     std::cout << "Theoretical contact EE z: " << target_ee_contact_z << std::endl;
 
-    // Limiti dentro la cesta
-    double min_x = place_area_pos[0] - place_area_size[0] / 2.0 + wall_bin_margin;
-    double max_x = place_area_pos[0] + place_area_size[0] / 2.0 - wall_bin_margin;
+    double approach_clearance;
 
-    double min_y = place_area_pos[1] - place_area_size[1] / 2.0 + wall_bin_margin;
-    double max_y = place_area_pos[1] + place_area_size[1] / 2.0 - wall_bin_margin;
+    if (hard_scene) {
+        // Nel caso hard l'oggetto è coricato e anche le dita stanno più basse.
+        // Serve più distanza dalla superficie.
+        approach_clearance = 0.220;
+    } else {
+        // Easy: mantieni il comportamento precedente.
+        approach_clearance = offset_obj_basket;
+    }
+
+    double target_ee_above_random_z =  (target_ee_contact_z + approach_clearance);
+
+    std::cout << "Above-random EE z: " << target_ee_above_random_z << std::endl;
+
+    double min_x;
+    double max_x;
+    double min_y;
+    double max_y;
+
+    // Limiti dentro la cesta
+    if (hard_scene){
+        // HARD: tengo un margine maggiore perché l'oggetto è coricato.
+        double object_margin_x = object_size[2] / 2.0;
+        double object_margin_y = object_size[1] / 2.0;
+
+        min_x = place_area_pos[0] - place_area_size[0] / 2.0 + wall_bin_margin + object_margin_x;
+        max_x = place_area_pos[0] + place_area_size[0] / 2.0 - wall_bin_margin - object_margin_x;
+
+        min_y = place_area_pos[1] - place_area_size[1] / 2.0 + wall_bin_margin + object_margin_y;
+        max_y = place_area_pos[1] + place_area_size[1] / 2.0 - wall_bin_margin - object_margin_y;
+    }else{
+        // EASY: identico a prima.
+        min_x = place_area_pos[0] - place_area_size[0] / 2.0 + wall_bin_margin;
+        max_x = place_area_pos[0] + place_area_size[0] / 2.0 - wall_bin_margin;
+
+        min_y = place_area_pos[1] - place_area_size[1] / 2.0 + wall_bin_margin;
+        max_y = place_area_pos[1] + place_area_size[1] / 2.0 - wall_bin_margin;
+    }
+
+    if (hard_scene && use_bin)
+    {
+        min_x = 0.39;
+        max_x = 0.43;
+
+        min_y = 0.02;
+        max_y = 0.06;
+    }
 
     std::cout << "Random x range: [" << min_x << ", " << max_x << "]" << std::endl;
     std::cout << "Random y range: [" << min_y << ", " << max_y << "]" << std::endl;
@@ -567,15 +705,15 @@ int main(int argc, char **argv){
 
         random_drop_pose = posa_robot_on_cabinet;
 
-        random_drop_pose.translation().x() = random_x;
-        random_drop_pose.translation().y() = random_y;
-        random_drop_pose.translation().z() = target_ee_pre_place_z;
+        random_drop_pose.translation().x() = random_x + ee_object_offset_x;
+        random_drop_pose.translation().y() = random_y + ee_object_offset_y;
+        random_drop_pose.translation().z() = target_ee_above_random_z;
 
         // Mantengo lo stesso orientamento usato sopra al cabinet.
         // In questo modo l'oggetto non viene capovolto.
         random_drop_pose.linear() = posa_robot_on_cabinet.linear();
 
-        std::cout << "Attempt " << i + 1 << " random drop target x: " << random_x << " y: " << random_y << " z: " << target_ee_pre_place_z << std::endl;
+        std::cout << "Attempt " << i + 1 << " random drop target x: " << random_x << " y: " << random_y << " z: " << target_ee_above_random_z << std::endl;
 
         std::vector<std::vector<double>> ik_solutions_cabinet_to_random_drop;
         robot_planning.inverse_kinematics(random_drop_pose,ik_solutions_cabinet_to_random_drop,final_on_cabinet_config);
@@ -589,10 +727,55 @@ int main(int argc, char **argv){
 
             trajectory_msgs::msg::JointTrajectory candidate_traj_to_random_drop;
 
-            bool valid_interp = interpolation_trajectory(ik_solutions_cabinet_to_random_drop[j],final_on_cabinet_config,num_interpolations,candidate_traj_to_random_drop,robot_planning);
+            std::vector<std::pair<std::string, std::string>> contact_pairs;
+            contact_pairs.clear();
+
+            bool target_state_valid =
+                robot_planning.check_state_validity(
+                    ik_solutions_cabinet_to_random_drop[j],
+                    contact_pairs
+                );
+
+            if (!target_state_valid)
+            {
+                std::cout << "TARGET RANDOM_DROP STATE IS NOT VALID / IN COLLISION" << std::endl;
+
+                for (const auto &pair : contact_pairs)
+                {
+                    std::cout << "Contact pair: "
+                            << pair.first << " - "
+                            << pair.second << std::endl;
+                }
+
+                continue;
+            }
+            else
+            {
+                std::cout << "Target random_drop state is valid. Trying MoveIt planning..." << std::endl;
+            }
+
+            /*bool valid_interp = interpolation_trajectory(
+                ik_solutions_cabinet_to_random_drop[j],
+                final_on_cabinet_config,
+                num_interpolations,
+                candidate_traj_to_random_drop,
+                robot_planning
+            );
 
             if (!valid_interp) {
                 std::cout << "IK found, but cabinet -> random_drop interpolation is not valid. Trying another solution/pose..." << std::endl;
+                continue;
+            }*/
+
+            bool valid_plan = robot_planning.plan_trajectory(
+                ik_solutions_cabinet_to_random_drop[j],
+                candidate_traj_to_random_drop,
+                {}
+            );
+
+            if (!valid_plan)
+            {
+                std::cout << "IK found and target valid, but MoveIt planning cabinet -> random_drop failed." << std::endl;
                 continue;
             }
 
