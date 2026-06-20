@@ -659,7 +659,7 @@ int main(int argc, char **argv){
 
     // Limiti dentro la cesta
     if (hard_scene){
-        // HARD: tengo un margine maggiore perché l'oggetto è coricato.
+        // l'oggetto è coricato.
         double object_margin_x = object_size[2] / 2.0;
         double object_margin_y = object_size[1] / 2.0;
 
@@ -669,7 +669,6 @@ int main(int argc, char **argv){
         min_y = place_area_pos[1] - place_area_size[1] / 2.0 + wall_bin_margin + object_margin_y;
         max_y = place_area_pos[1] + place_area_size[1] / 2.0 - wall_bin_margin - object_margin_y;
     }else{
-        // EASY: identico a prima.
         min_x = place_area_pos[0] - place_area_size[0] / 2.0 + wall_bin_margin;
         max_x = place_area_pos[0] + place_area_size[0] / 2.0 - wall_bin_margin;
 
@@ -677,14 +676,14 @@ int main(int argc, char **argv){
         max_y = place_area_pos[1] + place_area_size[1] / 2.0 - wall_bin_margin;
     }
 
-    if (hard_scene && use_bin)
+    /*if (hard_scene && use_bin)
     {
         min_x = 0.39;
         max_x = 0.43;
 
         min_y = 0.02;
         max_y = 0.06;
-    }
+    }*/
 
     std::cout << "Random x range: [" << min_x << ", " << max_x << "]" << std::endl;
     std::cout << "Random y range: [" << min_y << ", " << max_y << "]" << std::endl;
@@ -730,52 +729,26 @@ int main(int argc, char **argv){
             std::vector<std::pair<std::string, std::string>> contact_pairs;
             contact_pairs.clear();
 
-            bool target_state_valid =
-                robot_planning.check_state_validity(
-                    ik_solutions_cabinet_to_random_drop[j],
-                    contact_pairs
-                );
+            bool target_state_valid = robot_planning.check_state_validity(ik_solutions_cabinet_to_random_drop[j],contact_pairs);
 
-            if (!target_state_valid)
-            {
+            if (!target_state_valid){
                 std::cout << "TARGET RANDOM_DROP STATE IS NOT VALID / IN COLLISION" << std::endl;
 
-                for (const auto &pair : contact_pairs)
-                {
+                for (const auto &pair : contact_pairs){
                     std::cout << "Contact pair: "
                             << pair.first << " - "
                             << pair.second << std::endl;
                 }
 
                 continue;
-            }
-            else
-            {
+            }else{
                 std::cout << "Target random_drop state is valid. Trying MoveIt planning..." << std::endl;
             }
 
-            /*bool valid_interp = interpolation_trajectory(
-                ik_solutions_cabinet_to_random_drop[j],
-                final_on_cabinet_config,
-                num_interpolations,
-                candidate_traj_to_random_drop,
-                robot_planning
-            );
+            bool valid_interp = interpolation_trajectory(ik_solutions_cabinet_to_random_drop[j],final_on_cabinet_config,num_interpolations,candidate_traj_to_random_drop,robot_planning);
 
             if (!valid_interp) {
                 std::cout << "IK found, but cabinet -> random_drop interpolation is not valid. Trying another solution/pose..." << std::endl;
-                continue;
-            }*/
-
-            bool valid_plan = robot_planning.plan_trajectory(
-                ik_solutions_cabinet_to_random_drop[j],
-                candidate_traj_to_random_drop,
-                {}
-            );
-
-            if (!valid_plan)
-            {
-                std::cout << "IK found and target valid, but MoveIt planning cabinet -> random_drop failed." << std::endl;
                 continue;
             }
 

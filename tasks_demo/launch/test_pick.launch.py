@@ -22,7 +22,8 @@ def generate_launch_description():
     easy_config_on_table = [0.453786, -1.09956, -1.65806, -1.95477, 1.5708, 0.418879]
     hard_config_on_table = [1.08,-1.18,-2.25,-2.82,1.10,3.14]
     easy_config_on_cabinet = [-0.645772, -1.76278, 1.39626, -4.34587, 1.55334, 2.42601]
-    hard_config_on_cabinet = [-0.645772, -1.76278, 1.39626, -4.34587, 1.55334, 2.42601]
+    hard_config_on_cabinet = [3.80482, -1.37881, -1.39626, -5.06145, -1.58825, 0.680678]
+
 
     params_object = {
         "object_name": "object_box",
@@ -64,8 +65,8 @@ def generate_launch_description():
         "use_bin": USE_BIN,
         "hard_scene": HARD_SCENE,
         "num_interpolations": 30 if HARD_SCENE else 20,
-        "distance_obj_basket": 0.080,  #try 0.005 / 0.020 / 0.050 / 0.080
-        "wall_margin": 0.16,
+        "distance_obj_basket": 0.080 if USE_BIN else 0.010,
+        "wall_margin": 0.16 if USE_BIN else 0.010,
 
         "place_contact_object": "basket_bottom" if USE_BIN else "cabinet_lower_body",
         "cabinet_place_pos": [0.247, 0.000, -0.547],
