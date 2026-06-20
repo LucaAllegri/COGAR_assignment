@@ -66,7 +66,7 @@ boxes.append(CollisionObject(shape_type=BOX,name="opposite_table_leg_4",size=[0.
 #------------
 
 # OSTACOLO
-boxes.append(CollisionObject(shape_type=CYLINDER,name="obstacle_2",size=[0.6, 0.03],position=[-0.365, 0.150, 0.25],orientation=[0.0, 0.0, 0.0],color=[1.0, 1.0, 0.0, 1.0],ref_link="base_link",))
+boxes.append(CollisionObject(shape_type=CYLINDER,name="obstacle_2",size=[0.8, 0.03],position=[-0.375, 0.150, 0.35],orientation=[0.0, 0.0, 0.0],color=[1.0, 1.0, 0.0, 1.0],ref_link="base_link",))
 #------------
 
 def generate_launch_description():

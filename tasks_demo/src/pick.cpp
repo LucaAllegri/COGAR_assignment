@@ -12,6 +12,8 @@
 #include <cstdlib>
 #include <ctime>
 #include <cmath>
+#include <algorithm>
+#include <iomanip>
 
 bool contactWithDesiredObjectOnly(const std::vector<std::pair<std::string, std::string>> &contact_pairs, const std::string &contact_object,const std::string &object_name){
     bool desired_contact_found = false;
@@ -32,6 +34,47 @@ bool contactWithDesiredObjectOnly(const std::vector<std::pair<std::string, std::
     }
 
     return desired_contact_found;
+}
+
+bool isAllowedGraspContact(const std::string &a,const std::string &b,const std::string &object_name){
+    const bool object_involved = (a == object_name || b == object_name);
+
+    if (!object_involved) {
+        return false;
+    }
+
+    const std::string other_link = (a == object_name) ? b : a;
+
+    // Link/pad che possono toccare l'oggetto durante il grasp.
+    return other_link == "left_finger_pad" ||
+           other_link == "right_finger_pad" ||
+           other_link == "left_onrobot_2fg7_finger_link" ||
+           other_link == "right_onrobot_2fg7_finger_link";
+}
+
+bool stateValidAllowingGraspContacts(moveit_planning &robot_planning,
+                                    const std::vector<double> &joint_state,
+                                    const std::string &object_name,
+                                    std::vector<std::pair<std::string, std::string>> &contact_pairs){
+    contact_pairs.clear();
+
+    const bool valid = robot_planning.check_state_validity(joint_state, contact_pairs);
+
+    if (valid) {
+        return true;
+    }
+
+    if (contact_pairs.empty()) {
+        return false;
+    }
+
+    for (const auto &pair : contact_pairs) {
+        if (!isAllowedGraspContact(pair.first, pair.second, object_name)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 
@@ -199,12 +242,50 @@ void command_gripper(const rclcpp::Node::SharedPtr& node,
     rclcpp::sleep_for(std::chrono::milliseconds(static_cast<int>(duration_seconds * 1000.0)));
 }
 
+bool close_gripper_until_simulated_contact(const rclcpp::Node::SharedPtr &node,double gripper_open_position,double gripper_closed_position,double gripper_motion_duration,double simulated_contact_position,int closure_steps){
+    
+    if (closure_steps < 1) {
+        closure_steps = 1;
+    }
+
+    if (simulated_contact_position > gripper_open_position ||simulated_contact_position < gripper_closed_position){
+        RCLCPP_ERROR(node->get_logger(),"Invalid contact aperture %.5f m. It must lie between open %.5f m ""and closed %.5f m.",simulated_contact_position,gripper_open_position,gripper_closed_position);
+        return false;
+    }
+
+    RCLCPP_INFO(node->get_logger(),"Starting simulated contact grasp: closing from %.5f m to contact aperture %.5f m.",gripper_open_position,simulated_contact_position);
+
+    for (int step = 1; step <= closure_steps; ++step){
+        const double alpha = static_cast<double>(step) / static_cast<double>(closure_steps);
+
+        const double next_position =gripper_open_position +alpha * (gripper_closed_position - gripper_open_position);
+
+        if (next_position <= simulated_contact_position){
+            command_gripper(node, simulated_contact_position, gripper_motion_duration);
+
+            RCLCPP_INFO(node->get_logger(),"Simulated contact reached at %.5f m. ""Stopping gripper closure and confirming grasp.",simulated_contact_position);
+
+            return true;
+        }
+
+        command_gripper(node, next_position, gripper_motion_duration);
+
+        RCLCPP_INFO(node->get_logger(),"Gripper closing [%d/%d]: commanded position = %.5f m.",step,closure_steps,next_position);
+    }
+
+    RCLCPP_WARN(node->get_logger(),"Contact aperture %.5f m was not reached before the configured closure limit %.5f m.",simulated_contact_position,gripper_closed_position);
+
+    return false;
+}
+
 
 bool interpolation_trajectory(std::vector<double> ik_solution, 
 							  std::vector<double> stato_iniziale,
 							  int num_interpolation,
 							  trajectory_msgs::msg::JointTrajectory &trajectory,
-							  moveit_planning& robot_planning){
+							  moveit_planning& robot_planning, 
+                              bool object_attached = false,
+                              const std::string &object_name = ""){
 
 	int count_valid_interpolation;
 	bool find = false;
@@ -216,9 +297,20 @@ bool interpolation_trajectory(std::vector<double> ik_solution,
 	std::vector<double> stato_finale =ik_solution;  
 	count_valid_interpolation=0;
 
-	//stato iniziale e stato finale validi??
-	if (robot_planning.check_state_validity(stato_iniziale,contact_pairs) && robot_planning.check_state_validity(stato_finale,contact_pairs)) {
+	bool start_valid = false;
+    bool goal_valid = false;
 
+    if (object_attached) {
+        start_valid = stateValidAllowingGraspContacts(robot_planning, stato_iniziale, object_name, contact_pairs);
+
+        goal_valid = stateValidAllowingGraspContacts(robot_planning, stato_finale, object_name, contact_pairs);
+    }else {
+        start_valid = robot_planning.check_state_validity(stato_iniziale, contact_pairs);
+
+        goal_valid = robot_planning.check_state_validity(stato_finale, contact_pairs);
+    }
+
+    if (start_valid && goal_valid) {
 		std::vector<std::vector<double>> correct_state_interpolate;
 		
 		for (int l = 1; l <= num_interpolation; l++) {
@@ -248,8 +340,16 @@ bool interpolation_trajectory(std::vector<double> ik_solution,
 			Eigen::Vector3d x_axis = rotation_matrix.col(0); // Asse X della matrice di rotazione
 			Eigen::Vector3d y_axis = rotation_matrix.col(1); // Asse Y della matrice di rotazione
 
-			// Verifico la validità del punto interpolato
-			if (robot_planning.check_state_validity(stato_interpolato, contact_pairs)) {
+            bool state_valid = false;
+
+            if (object_attached) {
+                state_valid = stateValidAllowingGraspContacts(robot_planning,stato_interpolato,object_name,contact_pairs);
+            } else {
+                state_valid = robot_planning.check_state_validity(stato_interpolato,contact_pairs);
+            }
+
+            if (state_valid) {
+			    // Verifico la validità del punto interpolato
                 count_valid_interpolation++;
                 correct_state_interpolate.push_back(stato_interpolato);
             } else {
@@ -336,12 +436,13 @@ int main(int argc, char **argv){
 
     //******** GRIPPER
     double gripper_open_position = node->declare_parameter<double>("gripper_open_position", 0.030);
-    double gripper_closed_position = node->declare_parameter<double>("gripper_closed_position", 0.026);
+    double gripper_closed_position = node->declare_parameter<double>("gripper_closed_position", 0.021);
     double gripper_motion_duration =node->declare_parameter<double>("gripper_motion_duration", 1.0);
-    double target_force = node->declare_parameter<double>("target_force", 40.0);
-    double force_threshold = node->declare_parameter<double>("force_threshold", 30.0);
     std::string gripper_link = node->declare_parameter<std::string>("gripper_link", "gripper_base_link");
-    
+    bool use_simulated_contact_grasp = node->declare_parameter<bool>("use_simulated_force_grasp", true);
+    double simulated_contact_position = node->declare_parameter<double>("simulated_contact_position", 0.0270);
+    int simulated_closure_steps = node->declare_parameter<int>("simulated_closure_steps", 8);
+
     //******** PARAMS USEFUL
     int num_interpolations = node->declare_parameter<int>("num_interpolations",20);
     double offset_obj_basket = node->declare_parameter<double>("distance_obj_basket",0.080);
@@ -459,7 +560,7 @@ int main(int argc, char **argv){
         for (size_t i = 0; i < ik_solutions_grasp.size(); i++){
             RCLCPP_INFO(node->get_logger(), "Trying grasp IK solution %zu...", i);
 
-            if (interpolation_trajectory(ik_solutions_grasp[i],on_object_config,10,traj_pregrasp_to_grasp,robot_planning)){
+            if (interpolation_trajectory(ik_solutions_grasp[i],on_object_config,num_interpolations,traj_pregrasp_to_grasp,robot_planning)){
                 bool ok = robot_planning.execute_trajectory(traj_pregrasp_to_grasp);
 
                 if (!ok){
@@ -487,12 +588,24 @@ int main(int argc, char **argv){
 
     RCLCPP_INFO(node->get_logger(), "Closing gripper...");
 
-    command_gripper(node,gripper_closed_position,gripper_motion_duration);
+    bool grasp_confirmed = false;
 
-    RCLCPP_INFO(node->get_logger(), "Gripper closed.");
+    if (use_simulated_contact_grasp) {
+        grasp_confirmed = close_gripper_until_simulated_contact(node,gripper_open_position,gripper_closed_position,gripper_motion_duration,simulated_contact_position,simulated_closure_steps);
+    } else {
+        command_gripper(node, gripper_closed_position, gripper_motion_duration);
+        grasp_confirmed = true;
+        RCLCPP_WARN(node->get_logger(),"Position-only grasp selected: contact-based grasp confirmation is disabled.");
+    }
 
-    RCLCPP_INFO(node->get_logger(),"Attaching object '%s' to link '%s'...",object_name.c_str(),gripper_link.c_str());
+    if (!grasp_confirmed) {
+        RCLCPP_ERROR(node->get_logger(),"Simulated contact was not reached. Object will NOT be attached and the sequence is aborted.");
+        command_gripper(node, gripper_open_position, gripper_motion_duration);
+        rclcpp::shutdown();
+        return 1;
+    }
 
+    RCLCPP_INFO(node->get_logger(),"Grasp confirmed%s. Attaching object '%s' to link '%s'...",use_simulated_contact_grasp ? " by simulated contact" : "",object_name.c_str(),gripper_link.c_str());
     robot_planning.attach_object(object_name, gripper_link);
 
     rclcpp::sleep_for(std::chrono::milliseconds(500));
@@ -508,8 +621,18 @@ int main(int argc, char **argv){
     
     trajectory_msgs::msg::JointTrajectory reverse_traj_back_to_table;
 
-    if(interpolation_trajectory(robot_config_on_table,on_object_config, num_interpolations, reverse_traj_back_to_table, robot_planning)){
-        robot_planning.execute_trajectory(reverse_traj_back_to_table);
+    if(interpolation_trajectory(robot_config_on_table,on_object_config, num_interpolations, reverse_traj_back_to_table, robot_planning, true, object_name)){
+        bool ok = robot_planning.execute_trajectory(reverse_traj_back_to_table);
+
+        if (!ok) {
+            RCLCPP_ERROR(node->get_logger(),"Execution grasp -> above table failed.");
+            rclcpp::shutdown();
+            return 1;
+        }
+    }else {
+        RCLCPP_ERROR(node->get_logger(),"No collision-valid trajectory from grasp to above-table.");
+        rclcpp::shutdown();
+        return 1;
     }
 
     //********************************************************************************
@@ -523,7 +646,7 @@ int main(int argc, char **argv){
 
     bool reached_cabinet = false;
 
-    if (interpolation_trajectory(robot_config_on_cabinet,robot_config_on_table,num_interpolations,traj_table_to_on_cabinet,robot_planning)){
+    if (interpolation_trajectory(robot_config_on_cabinet,robot_config_on_table,num_interpolations,traj_table_to_on_cabinet,robot_planning, true,object_name)){
         bool ok = robot_planning.execute_trajectory(traj_table_to_on_cabinet);
 
         if (ok){
@@ -541,7 +664,7 @@ int main(int argc, char **argv){
         bool reached_cabinet_second_way = false;
 
         for(int i=0; i<ik_solutions_table_cabinet.size();i++){
-            if (interpolation_trajectory(ik_solutions_table_cabinet[i], robot_config_on_table, num_interpolations, traj_table_to_on_cabinet, robot_planning)){
+            if (interpolation_trajectory(ik_solutions_table_cabinet[i], robot_config_on_table, num_interpolations, traj_table_to_on_cabinet, robot_planning, true, object_name)){
                 
                 bool ok = robot_planning.execute_trajectory(traj_table_to_on_cabinet);
 
@@ -586,8 +709,7 @@ int main(int argc, char **argv){
         std::cout << "HARD EE-object offset y: " << ee_object_offset_y << std::endl;
         std::cout << "HARD EE-object offset z: " << ee_object_offset_z << std::endl;
     }else{
-        // EASY: come prima, interessa solo la quota verticale.
-        // x/y restano 0 per non modificare il comportamento precedente.
+        //  interessa solo la quota verticale.e.
         ee_object_offset_x = 0.0;
         ee_object_offset_y = 0.0;
         ee_object_offset_z = on_object_position[2] - object_position[2];
@@ -644,7 +766,6 @@ int main(int argc, char **argv){
         // Serve più distanza dalla superficie.
         approach_clearance = 0.220;
     } else {
-        // Easy: mantieni il comportamento precedente.
         approach_clearance = offset_obj_basket;
     }
 
@@ -675,15 +796,6 @@ int main(int argc, char **argv){
         min_y = place_area_pos[1] - place_area_size[1] / 2.0 + wall_bin_margin;
         max_y = place_area_pos[1] + place_area_size[1] / 2.0 - wall_bin_margin;
     }
-
-    /*if (hard_scene && use_bin)
-    {
-        min_x = 0.39;
-        max_x = 0.43;
-
-        min_y = 0.02;
-        max_y = 0.06;
-    }*/
 
     std::cout << "Random x range: [" << min_x << ", " << max_x << "]" << std::endl;
     std::cout << "Random y range: [" << min_y << ", " << max_y << "]" << std::endl;
@@ -735,9 +847,7 @@ int main(int argc, char **argv){
                 std::cout << "TARGET RANDOM_DROP STATE IS NOT VALID / IN COLLISION" << std::endl;
 
                 for (const auto &pair : contact_pairs){
-                    std::cout << "Contact pair: "
-                            << pair.first << " - "
-                            << pair.second << std::endl;
+                    std::cout << "Contact pair: "<< pair.first << " - "<< pair.second << std::endl;
                 }
 
                 continue;

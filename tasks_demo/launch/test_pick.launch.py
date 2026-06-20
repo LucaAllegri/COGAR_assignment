@@ -11,7 +11,7 @@ def generate_launch_description():
         .to_moveit_configs()
     )
 
-    USE_BIN = True
+    USE_BIN = False
     HARD_SCENE = True
 
     easy_on_object_position =  [-0.500, 0.150, 0.200]
@@ -47,11 +47,12 @@ def generate_launch_description():
 
     params_gripper = {
         "gripper_open_position": 0.030,
-        "gripper_closed_position": 0.026,
+        "gripper_closed_position": 0.021,
         "gripper_motion_duration": 1.0,
-        "target_force": 40.0,
-        "force_threshold": 30.0,
         "gripper_link": "gripper_base_link", # link used to attach the object during simulated grasp
+        "use_simulated_contact_grasp": True,
+        "simulated_contact_position": 0.0255,
+        "simulated_closure_steps": 24,
     }
 
     configs = {
@@ -65,7 +66,7 @@ def generate_launch_description():
         "use_bin": USE_BIN,
         "hard_scene": HARD_SCENE,
         "num_interpolations": 30 if HARD_SCENE else 20,
-        "distance_obj_basket": 0.080 if USE_BIN else 0.010,
+        "distance_obj_basket": 0.080,
         "wall_margin": 0.16 if USE_BIN else 0.010,
 
         "place_contact_object": "basket_bottom" if USE_BIN else "cabinet_lower_body",
