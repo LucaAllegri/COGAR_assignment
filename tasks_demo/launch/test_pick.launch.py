@@ -11,7 +11,7 @@ def generate_launch_description():
         .to_moveit_configs()
     )
 
-    USE_BIN = False
+    USE_BIN = True
     HARD_SCENE = True
 
     easy_on_object_position =  [-0.500, 0.150, 0.200]

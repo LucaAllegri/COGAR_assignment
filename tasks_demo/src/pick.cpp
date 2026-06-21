@@ -150,7 +150,7 @@ bool plan_vertical_cartesian_until_contact_from_state(const Eigen::Affine3d &sta
 
                 trajectory_msgs::msg::JointTrajectoryPoint point;
                 point.positions = candidate_config;
-                point.time_from_start = rclcpp::Duration::from_seconds(0.25 * static_cast<double>(trajectory.points.size()));
+                point.time_from_start = rclcpp::Duration::from_seconds(0.08 * static_cast<double>(trajectory.points.size()));
 
                 trajectory.points.push_back(point);
 
@@ -169,7 +169,7 @@ bool plan_vertical_cartesian_until_contact_from_state(const Eigen::Affine3d &sta
 
                 trajectory_msgs::msg::JointTrajectoryPoint point;
                 point.positions = candidate_config;
-                point.time_from_start = rclcpp::Duration::from_seconds(0.25 * static_cast<double>(trajectory.points.size()));
+                point.time_from_start = rclcpp::Duration::from_seconds(0.08 * static_cast<double>(trajectory.points.size()));
 
                 trajectory.points.push_back(point);
 
@@ -393,7 +393,7 @@ bool interpolation_trajectory(std::vector<double> ik_solution,
 
                 point.positions = correct_state_interpolate[i];
 
-                double duration_seconds = 0.5 * static_cast<double>(i + 1);
+                double duration_seconds = 0.25 * static_cast<double>(i + 1);
                 point.time_from_start = rclcpp::Duration::from_seconds(duration_seconds);
 
                 trajectory.points.push_back(point);
@@ -479,7 +479,7 @@ int main(int argc, char **argv){
 
     if (interpolation_trajectory(robot_config_on_table, robot_config_start, num_interpolations, traj_start_to_on_table, robot_planning)){
         robot_planning.execute_trajectory(traj_start_to_on_table);
-        rclcpp::sleep_for(std::chrono::seconds(5));
+        rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
 
     //********************************************************************************
@@ -520,7 +520,7 @@ int main(int argc, char **argv){
             }
 
             reached_object = true;
-            rclcpp::sleep_for(std::chrono::seconds(5));
+            rclcpp::sleep_for(std::chrono::milliseconds(500));
             break;
         }
     }
@@ -570,7 +570,7 @@ int main(int argc, char **argv){
 
                 on_object_config = ik_solutions_grasp[i];
                 reached_grasp = true;
-                rclcpp::sleep_for(std::chrono::seconds(2));
+                rclcpp::sleep_for(std::chrono::milliseconds(500));
                 break;
             }
         }
@@ -652,7 +652,7 @@ int main(int argc, char **argv){
         if (ok){
             final_on_cabinet_config = robot_config_on_cabinet;
             reached_cabinet = true;
-            rclcpp::sleep_for(std::chrono::seconds(5));
+            rclcpp::sleep_for(std::chrono::milliseconds(500));
         }
     }
 
@@ -675,7 +675,7 @@ int main(int argc, char **argv){
 
                 final_on_cabinet_config = ik_solutions_table_cabinet[i];
                 reached_cabinet_second_way = true;
-                rclcpp::sleep_for(std::chrono::seconds(5));
+                rclcpp::sleep_for(std::chrono::milliseconds(500));
                 break;
             }
         }
@@ -895,7 +895,7 @@ int main(int argc, char **argv){
                 continue;
             }
 
-            rclcpp::sleep_for(std::chrono::seconds(1));
+            rclcpp::sleep_for(std::chrono::milliseconds(500));
 
             std::cout << "Executing vertical descent to contact..." << std::endl;
 
@@ -911,7 +911,7 @@ int main(int argc, char **argv){
             reached_valid_place = true;
 
             std::cout << "Valid pre-place and vertical descent completed. Ready to release object." << std::endl;
-            rclcpp::sleep_for(std::chrono::seconds(2));
+            rclcpp::sleep_for(std::chrono::milliseconds(500));
             break;
         }
     }
@@ -954,7 +954,7 @@ int main(int argc, char **argv){
 
         std::cout << "Executing vertical ascent after release..." << std::endl;
         robot_planning.execute_trajectory(traj_up_from_contact);
-        rclcpp::sleep_for(std::chrono::seconds(2));
+        rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
 
     trajectory_msgs::msg::JointTrajectory traj_back_to_cabinet;
@@ -963,7 +963,7 @@ int main(int argc, char **argv){
     if (back_ok) {
         std::cout << "Returning above cabinet..." << std::endl;
         robot_planning.execute_trajectory(traj_back_to_cabinet);
-        rclcpp::sleep_for(std::chrono::seconds(2));
+        rclcpp::sleep_for(std::chrono::milliseconds(500));
     } else {
         RCLCPP_ERROR(node->get_logger(), "Could not return to cabinet after release.");
     }
