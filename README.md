@@ -29,7 +29,7 @@ The system performs a collision-aware pick-and-place task in RViz using ROS 2 Co
 Build the workspace before running:
 
 ```bash
-cd ~/b1a
+cd ~/B1a
 colcon build --symlink-install
 source install/setup.bash
 ```
@@ -39,7 +39,7 @@ source install/setup.bash
 Open **three terminals**. In each terminal, source the workspace:
 
 ```bash
-cd ~/b1a
+cd ~/B1a
 source install/setup.bash
 ```
 
