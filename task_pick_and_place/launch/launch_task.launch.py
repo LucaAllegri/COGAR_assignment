@@ -11,7 +11,7 @@ def generate_launch_description():
         .to_moveit_configs()
     )
 
-    USE_BIN = True
+    USE_BIN = False
     HARD_SCENE = True
 
     easy_on_object_position =  [-0.500, 0.150, 0.200]
@@ -48,11 +48,11 @@ def generate_launch_description():
     params_gripper = {
         "gripper_open_position": 0.030,
         "gripper_closed_position": 0.021,
-        "gripper_motion_duration": 1.0,
+        "gripper_motion_duration": 0.2,
         "gripper_link": "gripper_base_link", # link used to attach the object during simulated grasp
         "use_simulated_contact_grasp": True,
         "simulated_contact_position": 0.0255,
-        "simulated_closure_steps": 24,
+        "simulated_closure_steps": 2,
     }
 
     configs = {
@@ -77,9 +77,9 @@ def generate_launch_description():
 
     return LaunchDescription([
         Node(
-            package="tasks_demo",
-            executable="pick",
-            name="test_pick",
+            package="task_pick_and_place",
+            executable="pick_and_place",
+            name="test_pick_and_place",
             output="screen",
             parameters=[
                 moveit_config.robot_description,

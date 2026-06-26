@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(tasks_demo)
+project(task_pick_and_place)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -18,21 +18,9 @@ find_package(moveit_ros_planning_interface REQUIRED)
 
 find_package(moveit_planning REQUIRED)
 
-add_executable(pick_place src/pick_place_demo.cpp)
-add_executable(pick src/pick.cpp)
+add_executable(pick_and_place src/pick_and_place_task.cpp)
 
-ament_target_dependencies(pick_place
-  rclcpp
-  std_msgs
-  sensor_msgs
-  trajectory_msgs
-  geometry_msgs
-  moveit_msgs
-  moveit_ros_planning_interface
-  moveit_planning
-)
-
-ament_target_dependencies(pick
+ament_target_dependencies(pick_and_place
   rclcpp
   std_msgs
   sensor_msgs
@@ -44,8 +32,7 @@ ament_target_dependencies(pick
 )
 
 install(TARGETS
-  pick_place
-  pick
+  pick_and_place
   DESTINATION lib/${PROJECT_NAME}
 )
 

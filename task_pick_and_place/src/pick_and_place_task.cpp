@@ -15,6 +15,54 @@
 #include <algorithm>
 #include <iomanip>
 
+
+struct EvaluationMetrics{
+    int trials = 1;
+    bool task_success = false;
+    double planning_time_s = 0.0;
+    double execution_time_s = 0.0;
+};
+
+double elapsedSeconds(const std::chrono::steady_clock::time_point &start){
+    return std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+}
+
+bool executeAndMeasure(moveit_planning &robot_planning,
+                       const trajectory_msgs::msg::JointTrajectory &trajectory,
+                       EvaluationMetrics &metrics){
+    const auto start = std::chrono::steady_clock::now();
+    const bool ok = robot_planning.execute_trajectory(trajectory);
+    metrics.execution_time_s += elapsedSeconds(start);
+    return ok;
+}
+
+void printEvaluationSummary(const EvaluationMetrics &metrics,
+                            bool hard_scene,
+                            bool use_bin,
+                            const std::chrono::steady_clock::time_point & /*total_task_start*/){
+    const double task_success_rate = metrics.task_success ? 100.0 : 0.0;
+
+    std::cout << "\n==============================================" << std::endl;
+    std::cout << "          QUANTITATIVE EVALUATION" << std::endl;
+    std::cout << "==============================================" << std::endl;
+    std::cout << std::fixed << std::setprecision(3);
+    std::cout << "Scene: " << (hard_scene ? "Hard" : "Easy")
+              << (use_bin ? " + Basket" : " - Basket") << std::endl;
+    std::cout << "Number of trials: " << metrics.trials << std::endl;
+    std::cout << "Task success rate [%]: " << task_success_rate << std::endl;
+    std::cout << "Planning time [s]: " << metrics.planning_time_s << std::endl;
+    std::cout << "Execution time [s]: " << metrics.execution_time_s << std::endl;
+
+    // CSV line: scene,basket,trials,task_success_rate,planning_time_s,execution_time_s
+    std::cout << "RESULT," << (hard_scene ? "hard" : "easy") << ","
+              << (use_bin ? "basket" : "no_basket") << ","
+              << metrics.trials << ","
+              << task_success_rate << ","
+              << metrics.planning_time_s << ","
+              << metrics.execution_time_s << std::endl;
+    std::cout << "==============================================\n" << std::endl;
+}
+
 bool contactWithDesiredObjectOnly(const std::vector<std::pair<std::string, std::string>> &contact_pairs, const std::string &contact_object,const std::string &object_name){
     bool desired_contact_found = false;
 
@@ -78,9 +126,11 @@ bool stateValidAllowingGraspContacts(moveit_planning &robot_planning,
 }
 
 
-bool plan_vertical_cartesian_until_contact_from_state(const Eigen::Affine3d &start_pose,const std::vector<double> &start_config,double target_search_z,const std::string &contact_object,const std::string &object_name,double eef_step,double penetration,trajectory_msgs::msg::JointTrajectory &trajectory,moveit_planning &robot_planning){
+bool plan_vertical_cartesian_until_contact_from_state(const Eigen::Affine3d &start_pose,const std::vector<double> &start_config,double target_search_z,const std::string &contact_object,const std::string &object_name,double eef_step,double penetration,trajectory_msgs::msg::JointTrajectory &trajectory,moveit_planning &robot_planning, EvaluationMetrics &metrics){
+    const auto descent_start = std::chrono::steady_clock::now();
     if (start_config.size() != 6) {
         std::cout << "Invalid start_config size: " << start_config.size() << std::endl;
+        metrics.planning_time_s += elapsedSeconds(descent_start);
         return false;
     }
 
@@ -89,6 +139,7 @@ bool plan_vertical_cartesian_until_contact_from_state(const Eigen::Affine3d &sta
 
     if (dz_total >= 0.0) {
         std::cout << "Target z is not below start z. No vertical descent needed." << std::endl;
+        metrics.planning_time_s += elapsedSeconds(descent_start);
         return false;
     }
 
@@ -133,6 +184,7 @@ bool plan_vertical_cartesian_until_contact_from_state(const Eigen::Affine3d &sta
 
         if (ik_solutions.empty()) {
             std::cout << "No IK solution for vertical waypoint." << std::endl;
+            metrics.planning_time_s += elapsedSeconds(descent_start);
             return false;
         }
 
@@ -187,6 +239,7 @@ bool plan_vertical_cartesian_until_contact_from_state(const Eigen::Affine3d &sta
 
         if (!waypoint_accepted) {
             std::cout << "No valid IK solution for this vertical waypoint." << std::endl;
+            metrics.planning_time_s += elapsedSeconds(descent_start);
             return false;
         }
 
@@ -195,14 +248,16 @@ bool plan_vertical_cartesian_until_contact_from_state(const Eigen::Affine3d &sta
 
             if (accumulated_penetration >= penetration) {
                 std::cout << "Stopping trajectory after desired contact." << std::endl;
+                metrics.planning_time_s += elapsedSeconds(descent_start);
                 return true;
             }
-
+            metrics.planning_time_s += elapsedSeconds(descent_start);
             return true;
         }
     }
 
     std::cout << "Reached search z without detecting desired contact." << std::endl;
+    metrics.planning_time_s += elapsedSeconds(descent_start);
     return false;
 }
 
@@ -280,12 +335,14 @@ bool close_gripper_until_simulated_contact(const rclcpp::Node::SharedPtr &node,d
 
 
 bool interpolation_trajectory(std::vector<double> ik_solution, 
-							  std::vector<double> stato_iniziale,
-							  int num_interpolation,
-							  trajectory_msgs::msg::JointTrajectory &trajectory,
-							  moveit_planning& robot_planning, 
+                              std::vector<double> stato_iniziale,
+                              int num_interpolation,
+                              trajectory_msgs::msg::JointTrajectory &trajectory,
+                              moveit_planning& robot_planning,
+                              EvaluationMetrics &metrics,
                               bool object_attached = false,
                               const std::string &object_name = ""){
+    const auto interpolation_start = std::chrono::steady_clock::now();
 
 	int count_valid_interpolation;
 	bool find = false;
@@ -366,7 +423,7 @@ bool interpolation_trajectory(std::vector<double> ik_solution,
                 for (const auto &pair : contact_pairs) {
                     std::cout << "  " << pair.first << " -- " << pair.second << std::endl;
                 }
-
+                metrics.planning_time_s += elapsedSeconds(interpolation_start);
                 return false;
             }
 		}
@@ -399,16 +456,18 @@ bool interpolation_trajectory(std::vector<double> ik_solution,
                 trajectory.points.push_back(point);
             }
 
+            metrics.planning_time_s += elapsedSeconds(interpolation_start);
             return true;
         }
 	}
+    metrics.planning_time_s += elapsedSeconds(interpolation_start);
 	return false;
 }
 
 int main(int argc, char **argv){
     rclcpp::init(argc, argv);
 
-    auto const node = rclcpp::Node::make_shared("test_pick");
+    auto const node = rclcpp::Node::make_shared("test_pick_and_place");
     auto const move_group_node = std::make_shared<rclcpp::Node>("move_group_node");
 
     rclcpp::executors::SingleThreadedExecutor executor;
@@ -437,11 +496,11 @@ int main(int argc, char **argv){
     //******** GRIPPER
     double gripper_open_position = node->declare_parameter<double>("gripper_open_position", 0.030);
     double gripper_closed_position = node->declare_parameter<double>("gripper_closed_position", 0.021);
-    double gripper_motion_duration =node->declare_parameter<double>("gripper_motion_duration", 1.0);
+    double gripper_motion_duration =node->declare_parameter<double>("gripper_motion_duration", 0.2);
     std::string gripper_link = node->declare_parameter<std::string>("gripper_link", "gripper_base_link");
     bool use_simulated_contact_grasp = node->declare_parameter<bool>("use_simulated_force_grasp", true);
     double simulated_contact_position = node->declare_parameter<double>("simulated_contact_position", 0.0270);
-    int simulated_closure_steps = node->declare_parameter<int>("simulated_closure_steps", 8);
+    int simulated_closure_steps = node->declare_parameter<int>("simulated_closure_steps", 2);
 
     //******** PARAMS USEFUL
     int num_interpolations = node->declare_parameter<int>("num_interpolations",20);
@@ -452,6 +511,9 @@ int main(int argc, char **argv){
     std::vector<double> cabinet_place_size = node->declare_parameter<std::vector<double>>("cabinet_place_size",std::vector<double>{0.780, 0.560, 0.285});
     bool use_bin = node->declare_parameter<bool>("use_bin", true);
     bool hard_scene = node->declare_parameter<bool>("hard_scene", true);
+
+    EvaluationMetrics metrics;
+    const auto total_task_start = std::chrono::steady_clock::now();
 
     //******** CONFIG ROBOT INIZIALE 
 	std::vector<double> robot_config_start = node->declare_parameter<std::vector<double>>("start_config", std::vector<double>{0,-1.57,0.0,-1.57,0.0,0.0});
@@ -477,9 +539,20 @@ int main(int argc, char **argv){
 
     trajectory_msgs::msg::JointTrajectory traj_start_to_on_table;
 
-    if (interpolation_trajectory(robot_config_on_table, robot_config_start, num_interpolations, traj_start_to_on_table, robot_planning)){
-        robot_planning.execute_trajectory(traj_start_to_on_table);
+    if (interpolation_trajectory(robot_config_on_table, robot_config_start, num_interpolations, traj_start_to_on_table, robot_planning, metrics)){
+        const bool ok = executeAndMeasure(robot_planning, traj_start_to_on_table, metrics);
+        if (!ok) {
+            RCLCPP_ERROR(node->get_logger(), "Execution start -> above table failed.");
+            printEvaluationSummary(metrics, hard_scene, use_bin, total_task_start);
+            rclcpp::shutdown();
+            return 1;
+        }
         rclcpp::sleep_for(std::chrono::milliseconds(500));
+    } else {
+        RCLCPP_ERROR(node->get_logger(), "No collision-valid trajectory from start to above-table.");
+        printEvaluationSummary(metrics, hard_scene, use_bin, total_task_start);
+        rclcpp::shutdown();
+        return 1;
     }
 
     //********************************************************************************
@@ -503,16 +576,18 @@ int main(int argc, char **argv){
 
     std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG SOPRA TAVOLO ->  PRE-GRASP LATERALE: " << std::endl;
 
-	robot_planning.inverse_kinematics(robot_pick_pose, ik_solutions_table_object,robot_config_on_table); 
+	robot_planning.inverse_kinematics(robot_pick_pose, ik_solutions_table_object,robot_config_on_table);
+    if (ik_solutions_table_object.empty()) {
+    }
 
     trajectory_msgs::msg::JointTrajectory traj_table_to_on_object;
     std::vector<double> on_object_config;
     bool reached_object = false;
 
     for(int i=0; i<ik_solutions_table_object.size();i++){
-        if (interpolation_trajectory(ik_solutions_table_object[i], robot_config_on_table, num_interpolations, traj_table_to_on_object, robot_planning)){
+        if (interpolation_trajectory(ik_solutions_table_object[i], robot_config_on_table, num_interpolations, traj_table_to_on_object, robot_planning, metrics)){
             on_object_config = ik_solutions_table_object[i];
-            bool ok = robot_planning.execute_trajectory(traj_table_to_on_object);
+            bool ok = executeAndMeasure(robot_planning, traj_table_to_on_object, metrics);
 
             if (!ok) {
                 RCLCPP_ERROR(node->get_logger(), "Execution to object failed. Trying another IK solution.");
@@ -527,6 +602,7 @@ int main(int argc, char **argv){
 
     if (!reached_object) {
         RCLCPP_ERROR(node->get_logger(), "Could not reach object pick pose. Aborting before grasp.");
+        printEvaluationSummary(metrics, hard_scene, use_bin, total_task_start);
         rclcpp::shutdown();
         return 1;
     }
@@ -553,6 +629,8 @@ int main(int argc, char **argv){
         std::vector<std::vector<double>> ik_solutions_grasp;
 
         robot_planning.inverse_kinematics(grasp_pose,ik_solutions_grasp,on_object_config);
+        if (ik_solutions_grasp.empty()) {
+        }
 
         trajectory_msgs::msg::JointTrajectory traj_pregrasp_to_grasp;
         bool reached_grasp = false;
@@ -560,8 +638,8 @@ int main(int argc, char **argv){
         for (size_t i = 0; i < ik_solutions_grasp.size(); i++){
             RCLCPP_INFO(node->get_logger(), "Trying grasp IK solution %zu...", i);
 
-            if (interpolation_trajectory(ik_solutions_grasp[i],on_object_config,num_interpolations,traj_pregrasp_to_grasp,robot_planning)){
-                bool ok = robot_planning.execute_trajectory(traj_pregrasp_to_grasp);
+            if (interpolation_trajectory(ik_solutions_grasp[i],on_object_config,num_interpolations,traj_pregrasp_to_grasp,robot_planning,metrics)){
+                bool ok = executeAndMeasure(robot_planning, traj_pregrasp_to_grasp, metrics);
 
                 if (!ok){
                     RCLCPP_WARN(node->get_logger(), "Execution pre-grasp -> grasp failed.");
@@ -577,6 +655,7 @@ int main(int argc, char **argv){
 
         if (!reached_grasp){
             RCLCPP_ERROR(node->get_logger(), "Could not reach final lateral grasp pose.");
+            printEvaluationSummary(metrics, hard_scene, use_bin, total_task_start);
             rclcpp::shutdown();
             return 1;
         }
@@ -601,6 +680,7 @@ int main(int argc, char **argv){
     if (!grasp_confirmed) {
         RCLCPP_ERROR(node->get_logger(),"Simulated contact was not reached. Object will NOT be attached and the sequence is aborted.");
         command_gripper(node, gripper_open_position, gripper_motion_duration);
+        printEvaluationSummary(metrics, hard_scene, use_bin, total_task_start);
         rclcpp::shutdown();
         return 1;
     }
@@ -621,16 +701,18 @@ int main(int argc, char **argv){
     
     trajectory_msgs::msg::JointTrajectory reverse_traj_back_to_table;
 
-    if(interpolation_trajectory(robot_config_on_table,on_object_config, num_interpolations, reverse_traj_back_to_table, robot_planning, true, object_name)){
-        bool ok = robot_planning.execute_trajectory(reverse_traj_back_to_table);
+    if(interpolation_trajectory(robot_config_on_table,on_object_config, num_interpolations, reverse_traj_back_to_table, robot_planning, metrics, true, object_name)){
+        bool ok = executeAndMeasure(robot_planning, reverse_traj_back_to_table, metrics);
 
         if (!ok) {
             RCLCPP_ERROR(node->get_logger(),"Execution grasp -> above table failed.");
+            printEvaluationSummary(metrics, hard_scene, use_bin, total_task_start);
             rclcpp::shutdown();
             return 1;
         }
     }else {
         RCLCPP_ERROR(node->get_logger(),"No collision-valid trajectory from grasp to above-table.");
+        printEvaluationSummary(metrics, hard_scene, use_bin, total_task_start);
         rclcpp::shutdown();
         return 1;
     }
@@ -646,8 +728,8 @@ int main(int argc, char **argv){
 
     bool reached_cabinet = false;
 
-    if (interpolation_trajectory(robot_config_on_cabinet,robot_config_on_table,num_interpolations,traj_table_to_on_cabinet,robot_planning, true,object_name)){
-        bool ok = robot_planning.execute_trajectory(traj_table_to_on_cabinet);
+    if (interpolation_trajectory(robot_config_on_cabinet,robot_config_on_table,num_interpolations,traj_table_to_on_cabinet,robot_planning, metrics, true,object_name)){
+        bool ok = executeAndMeasure(robot_planning, traj_table_to_on_cabinet, metrics);
 
         if (ok){
             final_on_cabinet_config = robot_config_on_cabinet;
@@ -659,14 +741,16 @@ int main(int argc, char **argv){
     if (!reached_cabinet){
         std::cout << "SOLUZIONI INVERSE KINEMATICHE CONFIG SOPRA AL TAVOLO -> CONFIG SOPRA AL CABINET: " << std::endl;
         std::vector<std::vector<double>> ik_solutions_table_cabinet;
-        robot_planning.inverse_kinematics(posa_robot_on_cabinet, ik_solutions_table_cabinet,robot_config_on_table); 
+        robot_planning.inverse_kinematics(posa_robot_on_cabinet, ik_solutions_table_cabinet,robot_config_on_table);
+        if (ik_solutions_table_cabinet.empty()) {
+        }
 
         bool reached_cabinet_second_way = false;
 
         for(int i=0; i<ik_solutions_table_cabinet.size();i++){
-            if (interpolation_trajectory(ik_solutions_table_cabinet[i], robot_config_on_table, num_interpolations, traj_table_to_on_cabinet, robot_planning, true, object_name)){
+            if (interpolation_trajectory(ik_solutions_table_cabinet[i], robot_config_on_table, num_interpolations, traj_table_to_on_cabinet, robot_planning, metrics, true, object_name)){
                 
-                bool ok = robot_planning.execute_trajectory(traj_table_to_on_cabinet);
+                bool ok = executeAndMeasure(robot_planning, traj_table_to_on_cabinet, metrics);
 
                 if (!ok){
                     RCLCPP_ERROR(node->get_logger(), "Execution to cabinet failed. Trying another IK solution.");
@@ -682,6 +766,7 @@ int main(int argc, char **argv){
 
         if (!reached_cabinet_second_way) {
             RCLCPP_ERROR(node->get_logger(), "Could not reach cabinet pose.");
+            printEvaluationSummary(metrics, hard_scene, use_bin, total_task_start);
             rclcpp::shutdown();
             return 1;
         }
@@ -855,7 +940,7 @@ int main(int argc, char **argv){
                 std::cout << "Target random_drop state is valid. Trying MoveIt planning..." << std::endl;
             }
 
-            bool valid_interp = interpolation_trajectory(ik_solutions_cabinet_to_random_drop[j],final_on_cabinet_config,num_interpolations,candidate_traj_to_random_drop,robot_planning);
+            bool valid_interp = interpolation_trajectory(ik_solutions_cabinet_to_random_drop[j],final_on_cabinet_config,num_interpolations,candidate_traj_to_random_drop,robot_planning,metrics);
 
             if (!valid_interp) {
                 std::cout << "IK found, but cabinet -> random_drop interpolation is not valid. Trying another solution/pose..." << std::endl;
@@ -879,7 +964,7 @@ int main(int argc, char **argv){
 
             std::cout << "Vertical descent search from z " << random_drop_pose.translation().z() << " to z " << target_ee_search_z << " using contact object: " << place_contact_object<< std::endl;
 
-            bool vertical_ok = plan_vertical_cartesian_until_contact_from_state(random_drop_pose,random_drop_config,target_ee_search_z,place_contact_object,object_name,eef_step,penetration,candidate_traj_down_to_contact,robot_planning);
+            bool vertical_ok = plan_vertical_cartesian_until_contact_from_state(random_drop_pose,random_drop_config,target_ee_search_z,place_contact_object,object_name,eef_step,penetration,candidate_traj_down_to_contact,robot_planning,metrics);
 
             if (!vertical_ok) {
                 std::cout << "Vertical descent not valid from this random_drop_config. Trying another pose..." << std::endl;
@@ -888,7 +973,7 @@ int main(int argc, char **argv){
 
             std::cout << "Both trajectories are valid. Executing cabinet -> random_drop..." << std::endl;
 
-            bool ok_pre_place = robot_planning.execute_trajectory(candidate_traj_to_random_drop);
+            bool ok_pre_place = executeAndMeasure(robot_planning, candidate_traj_to_random_drop, metrics);
 
             if (!ok_pre_place) {
                 RCLCPP_ERROR(node->get_logger(), "Execution to random drop pose failed. Trying another pose.");
@@ -899,7 +984,7 @@ int main(int argc, char **argv){
 
             std::cout << "Executing vertical descent to contact..." << std::endl;
 
-            bool exec_down_ok = robot_planning.execute_trajectory(candidate_traj_down_to_contact);
+            bool exec_down_ok = executeAndMeasure(robot_planning, candidate_traj_down_to_contact, metrics);
 
             if (!exec_down_ok) {
                 RCLCPP_WARN(node->get_logger(), "Vertical descent execution failed. Trying another pose.");
@@ -910,6 +995,7 @@ int main(int argc, char **argv){
             traj_down_to_contact = candidate_traj_down_to_contact;
             reached_valid_place = true;
 
+
             std::cout << "Valid pre-place and vertical descent completed. Ready to release object." << std::endl;
             rclcpp::sleep_for(std::chrono::milliseconds(500));
             break;
@@ -918,6 +1004,7 @@ int main(int argc, char **argv){
 
     if (!reached_valid_place) {
         RCLCPP_ERROR(node->get_logger(), "Could not find any random pose valid for both cabinet trajectory and vertical descent.");
+        printEvaluationSummary(metrics, hard_scene, use_bin, total_task_start);
         rclcpp::shutdown();
         return 1;
     }
@@ -953,20 +1040,27 @@ int main(int argc, char **argv){
         }
 
         std::cout << "Executing vertical ascent after release..." << std::endl;
-        robot_planning.execute_trajectory(traj_up_from_contact);
+        executeAndMeasure(robot_planning, traj_up_from_contact, metrics);
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     }
 
     trajectory_msgs::msg::JointTrajectory traj_back_to_cabinet;
-    bool back_ok = interpolation_trajectory(final_on_cabinet_config,random_drop_config,num_interpolations,traj_back_to_cabinet,robot_planning);
+    bool back_ok = interpolation_trajectory(final_on_cabinet_config,random_drop_config,num_interpolations,traj_back_to_cabinet,robot_planning,metrics);
 
+    bool back_execution_ok = false;
     if (back_ok) {
         std::cout << "Returning above cabinet..." << std::endl;
-        robot_planning.execute_trajectory(traj_back_to_cabinet);
+        back_execution_ok = executeAndMeasure(robot_planning, traj_back_to_cabinet, metrics);
+        if (!back_execution_ok) {
+            RCLCPP_ERROR(node->get_logger(), "Execution return to cabinet failed.");
+        }
         rclcpp::sleep_for(std::chrono::milliseconds(500));
     } else {
         RCLCPP_ERROR(node->get_logger(), "Could not return to cabinet after release.");
     }
+
+    metrics.task_success = reached_valid_place && back_ok && back_execution_ok;
+    printEvaluationSummary(metrics, hard_scene, use_bin, total_task_start);
 
     rclcpp::shutdown();
     return 0;
